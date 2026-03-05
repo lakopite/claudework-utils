@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# new-claude: Create a new agent window in claude-work session
+# Usage: new-claude [--no-remote] [--path <dir>]
+
+remote=true
+work_path=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-remote) remote=false ;;
+    --remote) remote=true ;;
+    --path)
+      shift
+      work_path="$1"
+      ;;
+    *) echo "Unknown flag: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+# Verify session exists
+if ! tmux has-session -t claude-work 2>/dev/null; then
+  echo "ERROR: claude-work session not found. Run claudework first."
+  exit 1
+fi
+
+# Read run ID
+run_id=$(tmux show-environment -t claude-work CLAUDE_RUN_ID 2>/dev/null | cut -d= -f2)
+if [ -z "$run_id" ]; then
+  echo "ERROR: CLAUDE_RUN_ID not set in session. Something is wrong."
+  exit 1
+fi
+
+# Find next available agent number (backfill gaps)
+existing=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null \
+  | grep -E '^agent-[0-9]+$' \
+  | grep -oE '[0-9]+' \
+  | sort -n)
+
+n=1
+for taken in $existing; do
+  if [ "$n" -lt "$taken" ]; then break; fi
+  if [ "$n" -eq "$taken" ]; then n=$((n+1)); fi
+done
+
+name=$(printf "agent-%03d" $n)
+session_name="${name}-${run_id}"
+
+echo "Creating window: $name"
+tmux new-window -t claude-work -n "$name"
+if [ $? -ne 0 ]; then
+  echo "ERROR: Failed to create window $name"
+  exit 1
+fi
+
+if [ -n "$work_path" ]; then
+  echo "Changing directory to $work_path..."
+  tmux send-keys -t "claude-work:$name" "cd $(printf '%q' "$work_path")" Enter
+  sleep 1
+fi
+
+launch_path="${work_path:-$(pwd)}"
+echo "Launching claude $name on $launch_path..."
+tmux send-keys -t "claude-work:$name" "claude" Enter
+
+# Wait for claude to create the conversation file (up to 30s)
+project_dir="$HOME/.claude/projects/$(echo "$launch_path" | tr '/' '-')"
+echo "Waiting for claude to start (watching $project_dir)..."
+for i in $(seq 1 60); do
+  if [ -d "$project_dir" ] && ls "$project_dir"/*.jsonl 1>/dev/null 2>&1; then
+    echo "Conversation file detected after $((i / 2))s."
+    break
+  fi
+  sleep 0.5
+done
+
+echo "Renaming session to $session_name..."
+tmux send-keys -t "claude-work:$name" "/rename $session_name" Enter
+sleep 2
+tmux send-keys -t "claude-work:$name" "" Enter
+
+if [ "$remote" = true ]; then
+  sleep 1
+  echo "Enabling remote control..."
+  tmux send-keys -t "claude-work:$name" "/rc" Enter
+  sleep 2
+  tmux send-keys -t "claude-work:$name" "" Enter
+fi
+
+echo "Done: $name is ready (session: $session_name, remote: $remote)"

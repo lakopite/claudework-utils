@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# toggle-claude-remote: Toggle remote control on an agent window
+# Usage: toggle-claude-remote agent-NNN
+
+if [ -z "$1" ]; then
+  echo "Usage: toggle-claude-remote agent-NNN"
+  exit 1
+fi
+
+window="$1"
+
+# Verify window exists
+if ! tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^${window}$"; then
+  echo "ERROR: Window $window not found in claude-work"
+  exit 1
+fi
+
+echo "Toggling remote control on $window..."
+tmux send-keys -t "claude-work:$window" "/rc" Enter
+sleep 2
+tmux send-keys -t "claude-work:$window" "" Enter
+
+echo "Done: /rc sent to $window"

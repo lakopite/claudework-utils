@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# list-claudes: List all managed windows in claude-work session
+# Usage: list-claudes
+
+if ! tmux has-session -t claude-work 2>/dev/null; then
+  echo "No claude-work session found"
+  exit 0
+fi
+
+run_id=$(tmux show-environment -t claude-work CLAUDE_RUN_ID 2>/dev/null | cut -d= -f2)
+
+echo "Session: claude-work (run: ${run_id:-unknown})"
+echo "---"
+
+tmux list-windows -t claude-work -F '#W' 2>/dev/null \
+  | grep -E '^(bastion|home-base|agent-[0-9]+)$' \
+  | sort -t'-' -k2 -n

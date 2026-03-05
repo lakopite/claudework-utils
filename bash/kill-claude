@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# kill-claude: Gracefully shut down a single agent window
+# Usage: kill-claude agent-NNN
+
+if [ -z "$1" ]; then
+  echo "Usage: kill-claude agent-NNN"
+  exit 1
+fi
+
+window="$1"
+
+# Verify window exists
+if ! tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^${window}$"; then
+  echo "ERROR: Window $window not found in claude-work"
+  exit 1
+fi
+
+echo "Sending /exit to $window..."
+tmux send-keys -t "claude-work:$window" "/exit" Enter
+sleep 2
+tmux send-keys -t "claude-work:$window" "" Enter
+
+echo "Waiting for graceful shutdown..."
+sleep 2
+
+echo "Killing window $window..."
+tmux kill-window -t "claude-work:$window" 2>/dev/null
+
+echo "Done: $window has been shut down"

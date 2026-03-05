@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# kill-session: Gracefully shut down all agents and bastion, then kill session
+# Usage: kill-session
+
+if ! tmux has-session -t claude-work 2>/dev/null; then
+  echo "No claude-work session found"
+  exit 0
+fi
+
+# Collect all agent windows
+agents=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -E '^agent-[0-9]+$')
+
+# Send /exit to all agents
+if [ -n "$agents" ]; then
+  for agent in $agents; do
+    echo "Sending /exit to $agent..."
+    tmux send-keys -t "claude-work:$agent" "/exit" Enter
+    sleep 2
+    tmux send-keys -t "claude-work:$agent" "" Enter
+  done
+else
+  echo "No agent windows found"
+fi
+
+# Send /exit to bastion if it exists
+if tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^bastion$"; then
+  echo "Sending /exit to bastion..."
+  tmux send-keys -t "claude-work:bastion" "/exit" Enter
+  sleep 2
+  tmux send-keys -t "claude-work:bastion" "" Enter
+fi
+
+echo "Waiting for graceful shutdown..."
+sleep 3
+
+echo "Killing claude-work session..."
+tmux kill-session -t claude-work 2>/dev/null
+
+echo "Done: claude-work session killed"

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# go-claude: Switch to an agent window
+# Usage: go-claude agent-NNN
+
+if [ -z "$1" ]; then
+  echo "Usage: go-claude agent-NNN"
+  exit 1
+fi
+
+window="$1"
+
+if ! echo "$window" | grep -qE '^agent-[0-9]+$'; then
+  echo "ERROR: Can only switch to agent-NNN windows"
+  exit 1
+fi
+
+if ! tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^${window}$"; then
+  echo "ERROR: Window $window not found in claude-work"
+  exit 1
+fi
+
+tmux select-window -t "claude-work:$window"
+echo "Switched to $window"
