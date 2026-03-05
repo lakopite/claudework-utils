@@ -20,6 +20,10 @@ fi
 
 target="$SESSION:$window"
 
+# Step 0: Dismiss any active prompt (e.g. AskUserQuestion) — Escape is a no-op if none
+tmux send-keys -t "$target" Escape
+sleep 1
+
 # Step 1: Check if RC is currently active by pressing down arrow
 before=$(tmux capture-pane -t "$target" -p -S -5)
 tmux send-keys -t "$target" Down
