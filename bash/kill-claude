@@ -16,6 +16,11 @@ if ! tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^${window}$
   exit 1
 fi
 
+if [ "$window" = "bastion" ] || [ "$window" = "rotator" ] || [ "$window" = "home-base" ]; then
+  echo "ERROR: Use kill-session to shut down $window"
+  exit 1
+fi
+
 echo "Sending /exit to $window..."
 tmux send-keys -t "claude-work:$window" "/exit" Enter
 sleep 2

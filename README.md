@@ -15,6 +15,7 @@ Shell utilities available on the agent user's PATH for managing agent windows wi
 | `kill-claudes` | Gracefully shut down all agents (preserves bastion and session) |
 | `kill-session` | Shut down all agents, bastion, and the session itself |
 | `toggle-claude-remote` | Toggle remote control on an agent window |
+| `rotate-bastion` | Create or rotate the bastion window (supports `--loop` for continuous rotation) |
 | `check-retiring` | UserPromptSubmit hook that rejects prompts on rotated-out bastions |
 
 ## setup/

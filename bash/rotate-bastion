@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# rotate-bastion: Create or rotate the bastion window in claude-work
+# Usage: rotate-bastion [--loop]
+#   --loop: Run continuously, rotating every 5 minutes
+
+SESSION=claude-work
+ROTATE_INTERVAL=300
+
+loop=false
+if [ "$1" = "--loop" ]; then
+  loop=true
+fi
+
+rotate_once() {
+  # Verify session exists
+  if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "ERROR: $SESSION session not found."
+    return 1
+  fi
+
+  # Read run ID
+  run_id=$(tmux show-environment -t "$SESSION" CLAUDE_RUN_ID 2>/dev/null | cut -d= -f2)
+  if [ -z "$run_id" ]; then
+    echo "ERROR: CLAUDE_RUN_ID not set in session."
+    return 1
+  fi
+
+  has_bastion=false
+  if tmux list-windows -t "$SESSION" -F '#W' 2>/dev/null | grep -q "^bastion$"; then
+    has_bastion=true
+  fi
+
+  echo "$(date '+%H:%M:%S') Creating new bastion..."
+  tmux new-window -t "$SESSION" -n bastion-new
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to create bastion-new window"
+    return 1
+  fi
+
+  tmux send-keys -t "$SESSION:bastion-new" "claude" Enter
+
+  # Wait for claude to start (up to 30s)
+  project_dir="$HOME/.claude/projects/$(echo "$HOME" | tr '/' '-')"
+  echo "Waiting for claude to start..."
+  for i in $(seq 1 60); do
+    if [ -d "$project_dir" ] && ls "$project_dir"/*.jsonl 1>/dev/null 2>&1; then
+      echo "Conversation file detected after $((i / 2))s."
+      break
+    fi
+    sleep 0.5
+  done
+  sleep 3
+
+  echo "Renaming session to bastion-$run_id..."
+  tmux send-keys -t "$SESSION:bastion-new" "/rename bastion-$run_id" Enter
+  sleep 2
+  tmux send-keys -t "$SESSION:bastion-new" "" Enter
+
+  sleep 1
+  echo "Enabling remote control..."
+  tmux send-keys -t "$SESSION:bastion-new" "/rc" Enter
+  sleep 2
+  tmux send-keys -t "$SESSION:bastion-new" "" Enter
+
+  # Wait for RC to connect
+  sleep 8
+
+  # Clean up any existing bastion-retiring (its grace period is over)
+  if tmux list-windows -t "$SESSION" -F '#W' 2>/dev/null | grep -q "^bastion-retiring$"; then
+    echo "Cleaning up previous bastion-retiring..."
+    tmux send-keys -t "$SESSION:bastion-retiring" "/exit" Enter
+    sleep 2
+    tmux send-keys -t "$SESSION:bastion-retiring" "" Enter
+    sleep 2
+    tmux kill-window -t "$SESSION:bastion-retiring" 2>/dev/null
+  fi
+
+  # Retire current bastion if it exists
+  if [ "$has_bastion" = true ]; then
+    echo "Retiring current bastion..."
+    tmux rename-window -t "$SESSION:bastion" bastion-retiring
+  fi
+
+  # Promote new bastion
+  echo "Promoting bastion-new to bastion..."
+  tmux rename-window -t "$SESSION:bastion-new" bastion
+
+  echo "$(date '+%H:%M:%S') Rotation complete."
+}
+
+if [ "$loop" = true ]; then
+  echo "Starting bastion rotator (interval: ${ROTATE_INTERVAL}s)..."
+  while true; do
+    rotate_once
+    echo "$(date '+%H:%M:%S') Next rotation in ${ROTATE_INTERVAL}s..."
+    sleep $ROTATE_INTERVAL
+  done
+else
+  rotate_once
+fi

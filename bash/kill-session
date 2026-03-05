@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# kill-session: Gracefully shut down all agents and bastion, then kill session
+# kill-session: Gracefully shut down all agents, bastions, and rotator, then kill session
 # Usage: kill-session
 
 if ! tmux has-session -t claude-work 2>/dev/null; then
@@ -21,6 +21,14 @@ if [ -n "$agents" ]; then
   done
 else
   echo "No agent windows found"
+fi
+
+# Send /exit to bastion-retiring if it exists
+if tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^bastion-retiring$"; then
+  echo "Sending /exit to bastion-retiring..."
+  tmux send-keys -t "claude-work:bastion-retiring" "/exit" Enter
+  sleep 2
+  tmux send-keys -t "claude-work:bastion-retiring" "" Enter
 fi
 
 # Send /exit to bastion if it exists
