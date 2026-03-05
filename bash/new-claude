@@ -73,6 +73,7 @@ for i in $(seq 1 60); do
   fi
   sleep 0.5
 done
+sleep 3
 
 echo "Renaming session to $session_name..."
 tmux send-keys -t "claude-work:$name" "/rename $session_name" Enter
