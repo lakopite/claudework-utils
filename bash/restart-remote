@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# restart-remote: Restart remote control on an agent window
+# Usage: restart-remote agent-NNN
+
+SESSION=claude-work
+
+if [ -z "$1" ]; then
+  echo "Usage: restart-remote agent-NNN"
+  exit 1
+fi
+
+window="$1"
+
+# Verify window exists
+if ! tmux list-windows -t "$SESSION" -F '#W' 2>/dev/null | grep -q "^${window}$"; then
+  echo "ERROR: Window $window not found in $SESSION"
+  exit 1
+fi
+
+target="$SESSION:$window"
+
+# Step 1: Check if RC is currently active by pressing down arrow
+before=$(tmux capture-pane -t "$target" -p -S -5)
+tmux send-keys -t "$target" Down
+sleep 1
+after=$(tmux capture-pane -t "$target" -p -S -5)
+
+if [ "$before" != "$after" ]; then
+  # Step 2: RC pane appeared — enter menu and disconnect
+  echo "Remote control is active, disconnecting first..."
+  tmux send-keys -t "$target" Enter
+  sleep 1
+  tmux send-keys -t "$target" Enter
+  sleep 2
+fi
+
+# Step 3: Start fresh remote control
+echo "Enabling remote control on $window..."
+tmux send-keys -t "$target" "/rc" Enter
+sleep 2
+tmux send-keys -t "$target" "" Enter
+
+# Wait for RC to connect
+sleep 5
+
+# Step 4: Verify RC is active — down arrow, enter menu, check, then Esc out
+before=$(tmux capture-pane -t "$target" -p -S -5)
+tmux send-keys -t "$target" Down
+sleep 1
+after=$(tmux capture-pane -t "$target" -p -S -5)
+
+if [ "$before" != "$after" ]; then
+  tmux send-keys -t "$target" Enter
+  sleep 1
+  pane_output=$(tmux capture-pane -t "$target" -p -S -5)
+  tmux send-keys -t "$target" Escape
+  sleep 1
+
+  if echo "$pane_output" | grep -qi "Remote Control"; then
+    echo "Done: Remote control is active on $window"
+    exit 0
+  fi
+fi
+
+echo "WARNING: Could not verify remote control is active on $window"
+exit 1
