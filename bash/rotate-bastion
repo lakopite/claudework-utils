@@ -32,7 +32,7 @@ rotate_once() {
   fi
 
   echo "$(date '+%H:%M:%S') Creating new bastion..."
-  tmux new-window -t "$SESSION" -n bastion-new
+  tmux new-window -d -t "$SESSION" -n bastion-new
   if [ $? -ne 0 ]; then
     echo "ERROR: Failed to create bastion-new window"
     return 1
