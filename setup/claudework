@@ -1,0 +1,43 @@
+#!/bin/bash
+# claudework: Create or attach to the claude-work tmux session
+# Runs as claude user via sudo
+# Install to lakopite's ~/.local/bin/claudework
+# Setup phase (heredoc — no TTY needed)
+sudo -u claude -i -- bash << 'SETUP'
+SESSION=claude-work
+if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+  tmux new-session -d -s "$SESSION" -n bastion
+  RUN_ID=$(head -c 4 /dev/urandom | xxd -p)
+  tmux set-environment -t "$SESSION" CLAUDE_RUN_ID "$RUN_ID"
+  echo "Created session $SESSION (run: $RUN_ID)"
+else
+  RUN_ID=$(tmux show-environment -t "$SESSION" CLAUDE_RUN_ID 2>/dev/null | cut -d= -f2)
+  echo "Attaching to session $SESSION (run: $RUN_ID)"
+fi
+if ! tmux list-windows -t "$SESSION" -F "#W" | grep -q "^bastion$"; then
+  tmux new-window -t "$SESSION" -n bastion
+  echo "Recreated bastion window"
+fi
+BASTION_PID=$(tmux display-message -t "$SESSION:bastion" -p "#{pane_pid}" 2>/dev/null)
+if [ -n "$BASTION_PID" ] && ! pgrep -P "$BASTION_PID" -x claude > /dev/null 2>&1; then
+  echo "Starting claude in bastion..."
+  tmux send-keys -t "$SESSION:bastion" "claude" Enter
+  sleep 3
+  echo "Renaming bastion session to bastion-$RUN_ID..."
+  tmux send-keys -t "$SESSION:bastion" "/rename bastion-$RUN_ID" Enter
+  sleep 2
+  tmux send-keys -t "$SESSION:bastion" Enter
+  sleep 1
+  echo "Enabling remote control on bastion..."
+  tmux send-keys -t "$SESSION:bastion" "/rc" Enter
+  sleep 2
+  tmux send-keys -t "$SESSION:bastion" Enter
+fi
+if ! tmux list-windows -t "$SESSION" -F "#W" | grep -q "^home-base$"; then
+  tmux new-window -t "$SESSION" -n home-base
+  echo "Recreated home-base window"
+fi
+tmux select-window -t "$SESSION:home-base"
+SETUP
+# Attach phase (needs real TTY)
+exec sudo -u claude -i -- tmux attach -t claude-work
