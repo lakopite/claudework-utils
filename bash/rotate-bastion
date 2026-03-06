@@ -66,6 +66,11 @@ rotate_once() {
   # Wait for RC to connect
   sleep 8
 
+  # Prime the new bastion with its role context
+  echo "Setting bastion role context..."
+  tmux send-keys -t "$SESSION:bastion-new" "You're a bastion session for Claude Code Web. These sessions rotate periodically to ensure there's always an active remote session available. When I tell you it's time to hand off, gently remind the user on each subsequent message that they should switch to the newer session." Enter
+  sleep 5
+
   # Clean up any existing bastion-retiring (its grace period is over)
   if tmux list-windows -t "$SESSION" -F '#W' 2>/dev/null | grep -q "^bastion-retiring$"; then
     echo "Cleaning up previous bastion-retiring..."
@@ -79,9 +84,8 @@ rotate_once() {
   # Retire current bastion if it exists
   if [ "$has_bastion" = true ]; then
     echo "Retiring current bastion..."
-    # Inject retirement notice into the old bastion's conversation so it reaches
-    # remote-control clients (hook rejections don't propagate through RC)
-    tmux send-keys -t "$SESSION:bastion" "You have been rotated out as the active bastion. Do NOT execute any commands or tools. If the user sends any message, respond ONLY with: \"This bastion has been retired. Please disconnect and reconnect to the new bastion.\"" Enter
+    # Trigger hand-off so the old bastion reminds users to switch sessions
+    tmux send-keys -t "$SESSION:bastion" "Time to hand off — the new bastion session is up." Enter
     sleep 2
     tmux rename-window -t "$SESSION:bastion" bastion-retiring
   fi
