@@ -79,6 +79,10 @@ rotate_once() {
   # Retire current bastion if it exists
   if [ "$has_bastion" = true ]; then
     echo "Retiring current bastion..."
+    # Inject retirement notice into the old bastion's conversation so it reaches
+    # remote-control clients (hook rejections don't propagate through RC)
+    tmux send-keys -t "$SESSION:bastion" "You have been rotated out as the active bastion. Do NOT execute any commands or tools. If the user sends any message, respond ONLY with: \"This bastion has been retired. Please disconnect and reconnect to the new bastion.\"" Enter
+    sleep 2
     tmux rename-window -t "$SESSION:bastion" bastion-retiring
   fi
 
