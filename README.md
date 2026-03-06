@@ -27,7 +27,7 @@ Claude Code slash commands, installed to `~/.claude/commands/`. These modify Cla
 | `discuss.md` | Switches session into free-form discussion mode — conversation over action |
 | `dump-context.md` | Snapshots session understanding to `~/projects/shared/exports/` with auto-named, versioned files |
 | `pickup-context.md` | Loads a previously dumped context snapshot — lists available or fuzzy-matches by name |
-| `project-architect.md` | Interactive project architect — Socratic, discussion-first workflow for designing specs and scaffolding Claude project structure (CLAUDE.md, agents, commands, hooks, rules). Operates at a meta tier above the target project. Two phases: (1) what are we building, (2) how do we want to build it. Persists state in `.claude/_custom/command-notes/` |
+| `project-architect.md` | Interactive project architect — Socratic, discussion-first workflow for designing specs and scaffolding Claude project structure (CLAUDE.md, agents, commands, hooks, rules). Operates at a meta tier above the target project. Two phases: (1) what are we building, (2) how do we want to build it. Supports `ideate` arg for zero-overhead brainstorming. Persists state in `.claude/_custom/command-notes/` |
 
 ## setup/
 
