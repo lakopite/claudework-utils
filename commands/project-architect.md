@@ -115,15 +115,17 @@ This is where you design how the team (user + Claude) will actually work day-to-
 
 ## Persistent State
 
-Before ending a session (or when the user is done for now), update your notes:
+**Update notes before every response to the user.** You cannot predict when the user will leave, so treat every reply as potentially the last. Notes must be current before the user sees your message.
 
-**Project-level** (`.claude/_custom/command-notes/project-architect.md`):
+This only applies in full mode. Ideate mode does not read or write notes.
+
+**Project-level** (`<project-root>/.claude/_custom/command-notes/project-architect.md`) - **update every response:**
 - Current phase and progress
 - Key decisions made and their rationale
 - Open questions and unresolved topics
 - What was produced and what's still pending
 
-**User-level** (`~/.claude/_custom/command-notes/project-architect.md`):
+**User-level** (`~/.claude/_custom/command-notes/project-architect.md`) - **update when the dialogue surfaces methodology learnings:**
 - Cross-project learnings about the user's preferences
 - Patterns that worked well or didn't
 - Workflow preferences observed across projects
