@@ -18,6 +18,15 @@ Shell utilities available on the agent user's PATH for managing agent windows wi
 | `rotate-bastion` | Create or rotate the bastion window (supports `--loop` for continuous rotation) |
 | `check-retiring` | UserPromptSubmit hook that rejects prompts on rotated-out bastions |
 
+## commands/
+
+Claude Code slash commands, installed to `~/.claude/commands/`. These modify Claude's behavior within a session.
+
+| Command | Description |
+|---------|-------------|
+| `sh.md` | Bash passthrough for remote control mode (workaround for direct bash not working) |
+| `discuss.md` | Switches session into free-form discussion mode — conversation over action |
+
 ## setup/
 
-Scripts and config for bootstrapping a claudework session from the host user. Includes the tmux session launcher and a bash passthrough workaround for remote control mode. See [setup/README.md](setup/README.md) for details.
+Scripts for bootstrapping a claudework session from the host user. Includes the tmux session launcher. See [setup/README.md](setup/README.md) for details.
