@@ -25,6 +25,8 @@ Claude Code slash commands, installed to `~/.claude/commands/`. These modify Cla
 |---------|-------------|
 | `sh.md` | Bash passthrough for remote control mode (workaround for direct bash not working) |
 | `discuss.md` | Switches session into free-form discussion mode — conversation over action |
+| `dump-context.md` | Snapshots session understanding to `~/projects/shared/exports/` with auto-named, versioned files |
+| `pickup-context.md` | Loads a previously dumped context snapshot — lists available or fuzzy-matches by name |
 
 ## setup/
 
