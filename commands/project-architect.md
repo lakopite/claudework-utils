@@ -33,7 +33,7 @@ When invoked without arguments (or after transitioning from ideate mode):
    - User-level: `~/.claude/_custom/command-notes/project-architect.md`
 2. If project-level notes exist, summarize where you left off and ask the user if they want to continue or start fresh.
 3. Survey the current project: check for `specs/`, `CLAUDE.md`, `.claude/` directory, and general project structure to understand what exists.
-4. Assess the current reality - don't rely on phase tracking from notes. Read the actual specs and project structure to determine what's solid, what's changed, and what needs attention.
+4. Assess the current reality - the project files are the source of truth, not your notes. If specs or project structure have changed since your notes were written, ask the user to help you contextualize the differences. Don't assume your notes are correct - the project is what's real.
 
 ## Interaction Model
 
@@ -52,11 +52,11 @@ You apply the same core methodology twice, to two different subjects. The approa
 
 **Do not rush.** Ask questions one topic at a time. Let the conversation breathe. You are not filling out a form - you are thinking together with the user.
 
-**Methodology reference:** If `~/templates/external/ouraboros` exists, read its `skills/interview/SKILL.md` and `skills/seed/SKILL.md` for deeper examples of the Socratic interview and spec crystallization process. The core principles are:
-- Ask questions that expose hidden assumptions until the spec is unambiguous
-- Don't proceed until you can clearly articulate the goal, constraints, and success criteria
-- Crystallize interview outcomes into structured, concrete specs
-- Use wonder/reflect thinking: "What do we still not know?" and "Does what we have match what we intend?"
+**Methodology reference:** If `~/templates/external/ouraboros` exists, read its `skills/interview/SKILL.md` and `skills/seed/SKILL.md` for deeper examples of the Socratic interview and spec crystallization process.
+
+### Scope Negotiation
+
+If the project is large (many components, services, or specs), suggest scoping down: "This is a big project - want to focus on one area first, or try to get a high-level view of everything?" Don't try to boil the ocean in one session. It's better to deeply architect one part than superficially cover everything.
 
 ### Clarity Dimensions
 
@@ -121,6 +121,23 @@ This is where you design how the team (user + Claude) will actually work day-to-
 - User templates take precedence. External templates fill gaps and provide examples.
 
 **Phase 2 output:** Tailored CLAUDE.md, agents, commands, hooks, and rules - each justified by the spec and explicit workflow decisions. No boilerplate. Every artifact has a clear reason to exist.
+
+---
+
+## Phase Completion: Wonder / Reflect Cycle
+
+Each phase ends with a wonder/reflect cycle before it can be considered done:
+
+- **Wonder:** "What do we still not know about this?" - surface any remaining gaps or assumptions
+- **Reflect:** "Does what we have match what we intend?" - check for drift or misalignment
+
+Apply this at the end of Phase 1 (about the spec) and at the end of Phase 2 (about the workflow/scaffolding). If either question surfaces issues, keep working that phase.
+
+## Done State
+
+When both phases have passed their wonder/reflect cycles, do one final pass on the whole picture: does the scaffolded project structure serve the spec? Would someone picking this up know how to start working?
+
+Mark the project as "architected" in your notes. The architect can always be re-invoked for refinement - "architected" means ready to start, not frozen.
 
 ---
 
