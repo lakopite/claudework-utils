@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# project-architect: Spin up a new agent window for project architecture
+# Usage: project-architect <project-name> [--ideate]
+
+project=""
+ideate=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ideate) ideate=true ;;
+    -*)
+      echo "Unknown flag: $1"
+      echo "Usage: project-architect <project-name> [--ideate]"
+      exit 1
+      ;;
+    *)
+      if [ -z "$project" ]; then
+        project="$1"
+      else
+        echo "ERROR: Unexpected argument: $1"
+        echo "Usage: project-architect <project-name> [--ideate]"
+        exit 1
+      fi
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$project" ]; then
+  echo "ERROR: Project name required."
+  echo "Usage: project-architect <project-name> [--ideate]"
+  exit 1
+fi
+
+project_path="$HOME/projects/$project"
+
+# Create project directory if it doesn't exist
+if [ ! -d "$project_path" ]; then
+  echo "Creating project directory: $project_path"
+  mkdir -p "$project_path"
+  git -C "$project_path" init --quiet
+  echo "Initialized git repo in $project_path"
+else
+  echo "Project directory exists: $project_path"
+fi
+
+# Launch a new agent window pointed at the project
+echo "Launching architect agent..."
+new-claude --path "$project_path"
+
+# Get the agent window name (most recently created agent window)
+agent_window=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null \
+  | grep -E '^agent-[0-9]+' \
+  | sort -V \
+  | tail -1)
+
+if [ -z "$agent_window" ]; then
+  echo "ERROR: Could not find agent window."
+  exit 1
+fi
+
+echo "Agent window: $agent_window"
+
+# Send /project-architect command
+if [ "$ideate" = true ]; then
+  echo "Starting project-architect in ideate mode..."
+  tmux send-keys -t "claude-work:$agent_window" "/project-architect ideate" Enter
+else
+  echo "Starting project-architect..."
+  tmux send-keys -t "claude-work:$agent_window" "/project-architect" Enter
+fi
+
+echo "Done: project-architect running for '$project' on window $agent_window"

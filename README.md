@@ -16,6 +16,7 @@ Shell utilities available on the agent user's PATH for managing agent windows wi
 | `kill-session` | Shut down all agents, bastion, and the session itself |
 | `restart-remote` | Restart remote control on an agent window (disconnects first if already active) |
 | `rotate-bastion` | Create or rotate the bastion window (supports `--loop` for continuous rotation). Primes new bastions with role context and triggers a graceful hand-off when retiring the old one |
+| `project-architect` | Spin up an architect agent for a project — creates `~/projects/<name>` with git init if needed, launches a new agent window, and runs `/project-architect`. Supports `--ideate` flag for brainstorming mode |
 
 ## commands/
 
