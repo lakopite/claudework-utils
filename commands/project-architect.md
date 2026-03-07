@@ -143,9 +143,34 @@ Mark the project as "architected" in your notes. The architect can always be re-
 
 ---
 
+## Post-Mortem: Methodology Interview
+
+**This happens once — only after Phase 2 is fully complete and the project is marked "architected."** This is a separate conversation beat, not something woven into the phases.
+
+Conduct a short post-mortem interview with the user about the architect process itself:
+
+- What worked well in this session? What felt clunky or slow?
+- Were there points where the questioning was too much or not enough?
+- Did the phase structure (spec → workflow) feel natural for this project?
+- Any patterns or preferences that emerged that should carry forward to other projects?
+
+Based on this conversation:
+
+1. **Update user-level notes** (`~/.claude/_custom/command-notes/project-architect.md`) with cross-project methodology learnings:
+   - User preferences for how the architect process should run
+   - Patterns that worked well or didn't
+   - Workflow preferences observed across projects
+   - Methodology refinements
+
+2. **Extract generic templates** where applicable — if the session produced specs, agents, commands, hooks, or rules that are generalizable beyond this specific project, offer to save cleaned-up versions to `~/templates/` for reuse. Discuss with the user which artifacts (if any) are worth templating before writing anything.
+
+This is the **only** time user-level notes are written. Do not update them during phases or between responses.
+
+---
+
 ## Persistent State
 
-**Update notes before every response to the user.** You cannot predict when the user will leave, so treat every reply as potentially the last. Notes must be current before the user sees your message.
+**Update project-level notes before every response to the user.** You cannot predict when the user will leave, so treat every reply as potentially the last. Notes must be current before the user sees your message.
 
 Keep notes concise - capture decisions, current state, and open questions, not full conversation history. A future architect session should be able to orient itself in seconds, not minutes.
 
@@ -157,11 +182,7 @@ Writing notes only applies in full mode. Ideate mode reads notes and surveys the
 - Open questions and unresolved topics
 - What was produced and what's still pending
 
-**User-level** (`~/.claude/_custom/command-notes/project-architect.md`) - **update when the dialogue surfaces methodology learnings:**
-- Cross-project learnings about the user's preferences
-- Patterns that worked well or didn't
-- Workflow preferences observed across projects
-- Methodology refinements
+**User-level** (`~/.claude/_custom/command-notes/project-architect.md`) - **only written during the post-mortem interview** (see above)
 
 Create the `_custom/command-notes/` directories if they don't exist.
 
