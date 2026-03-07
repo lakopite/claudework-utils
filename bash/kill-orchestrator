@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# kill-orchestrator: Kill a specific orchestrator window
+# Usage: kill-orchestrator <window-name>
+# Example: kill-orchestrator orch-finclaude-personal-finance-engine
+
+if [ -z "$1" ]; then
+  echo "Usage: kill-orchestrator <window-name>"
+  echo "Run list-orchestrators to see active orchestrators."
+  exit 1
+fi
+
+window="$1"
+
+if ! tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^${window}$"; then
+  echo "ERROR: Window $window not found in claude-work"
+  exit 1
+fi
+
+if [[ ! "$window" =~ ^orch- ]]; then
+  echo "ERROR: $window is not an orchestrator window (must start with orch-)"
+  exit 1
+fi
+
+echo "Killing orchestrator window $window..."
+tmux kill-window -t "claude-work:$window" 2>/dev/null
+
+echo "Done: $window killed"

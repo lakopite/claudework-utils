@@ -14,5 +14,5 @@ echo "Session: claude-work (run: ${run_id:-unknown})"
 echo "---"
 
 tmux list-windows -t claude-work -F '#W' 2>/dev/null \
-  | grep -E '^(bastion|bastion-new|bastion-retiring|home-base|rotator|agent-[0-9]+)$' \
+  | grep -E '^(bastion|bastion-new|bastion-retiring|home-base|rotator|agent-[0-9]+|orch-.+)$' \
   | sort -t'-' -k2 -n

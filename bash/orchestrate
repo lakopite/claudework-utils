@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# orchestrate: Run an orchestrated workflow convergence loop for a project component
+# Usage: orchestrate <project-name> <component> [--max-iterations N]
+# Meant to be run inside a tmux window (via run-orchestrate or manually)
+
+set -euo pipefail
+
+project=""
+component=""
+max_iterations=25
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --max-iterations)
+      shift
+      max_iterations="$1"
+      ;;
+    -*)
+      echo "Unknown flag: $1"
+      echo "Usage: orchestrate <project-name> <component> [--max-iterations N]"
+      exit 1
+      ;;
+    *)
+      if [ -z "$project" ]; then
+        project="$1"
+      elif [ -z "$component" ]; then
+        component="$1"
+      else
+        echo "ERROR: Unexpected argument: $1"
+        echo "Usage: orchestrate <project-name> <component> [--max-iterations N]"
+        exit 1
+      fi
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$project" ] || [ -z "$component" ]; then
+  echo "ERROR: Project name and component required."
+  echo "Usage: orchestrate <project-name> <component> [--max-iterations N]"
+  exit 1
+fi
+
+project_dir="$HOME/projects/$project"
+
+if [ ! -d "$project_dir" ]; then
+  echo "ERROR: Project directory not found: $project_dir"
+  exit 1
+fi
+
+# Create log directory
+log_dir="$project_dir/orchestrator-logs"
+mkdir -p "$log_dir"
+
+echo "========================================"
+echo "Orchestrator: $project / $component"
+echo "Max iterations: $max_iterations"
+echo "Logs: $log_dir"
+echo "========================================"
+
+iteration=0
+final_status="max-iterations-reached"
+
+while [ "$iteration" -lt "$max_iterations" ]; do
+  iteration=$((iteration + 1))
+  log_file="$log_dir/iteration-$(printf '%03d' $iteration).log"
+
+  echo ""
+  echo "--- Iteration $iteration / $max_iterations ---"
+  echo "Log: $log_file"
+  echo ""
+
+  # Run orchestrator agent in print mode, capture output
+  cd "$project_dir"
+  claude --agent orchestrator \
+    --dangerously-skip-permissions \
+    -p "$component" \
+    2>&1 | tee "$log_file" || true
+
+  # Extract sentinel from output
+  sentinel=$(grep -o 'ORCHESTRATOR_RESULT:[a-z]*' "$log_file" | tail -1 || true)
+
+  case "$sentinel" in
+    ORCHESTRATOR_RESULT:continue)
+      echo ""
+      echo ">>> Sentinel: continue (iteration $iteration)"
+      ;;
+    ORCHESTRATOR_RESULT:complete)
+      echo ""
+      echo ">>> Sentinel: complete (iteration $iteration)"
+      final_status="complete"
+      break
+      ;;
+    ORCHESTRATOR_RESULT:blocked)
+      echo ""
+      echo ">>> Sentinel: blocked (iteration $iteration)"
+      final_status="blocked"
+      break
+      ;;
+    *)
+      echo ""
+      echo ">>> ERROR: No valid sentinel found (iteration $iteration)"
+      final_status="no-sentinel"
+      break
+      ;;
+  esac
+done
+
+echo ""
+echo "========================================"
+echo "Orchestrator finished"
+echo "  Project: $project"
+echo "  Component: $component"
+echo "  Iterations: $iteration"
+echo "  Status: $final_status"
+echo "  Logs: $log_dir"
+echo "========================================"
+
+case "$final_status" in
+  complete) exit 0 ;;
+  *) exit 1 ;;
+esac

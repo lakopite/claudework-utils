@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# kill-orchestrators: Kill all orchestrator windows
+# Usage: kill-orchestrators
+
+if ! tmux has-session -t claude-work 2>/dev/null; then
+  echo "No claude-work session found"
+  exit 0
+fi
+
+orchestrators=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -E '^orch-' || true)
+
+if [ -z "$orchestrators" ]; then
+  echo "No orchestrators running"
+  exit 0
+fi
+
+for window in $orchestrators; do
+  echo "Killing $window..."
+  tmux kill-window -t "claude-work:$window" 2>/dev/null
+done
+
+echo "Done: all orchestrators killed"

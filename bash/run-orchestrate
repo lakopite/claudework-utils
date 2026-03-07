@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# run-orchestrate: Create a tmux window and run an orchestration loop
+# Usage: run-orchestrate <project-name> <component> [--max-iterations N]
+
+project=""
+component=""
+extra_args=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --max-iterations)
+      shift
+      extra_args="--max-iterations $1"
+      ;;
+    -*)
+      echo "Unknown flag: $1"
+      echo "Usage: run-orchestrate <project-name> <component> [--max-iterations N]"
+      exit 1
+      ;;
+    *)
+      if [ -z "$project" ]; then
+        project="$1"
+      elif [ -z "$component" ]; then
+        component="$1"
+      else
+        echo "ERROR: Unexpected argument: $1"
+        echo "Usage: run-orchestrate <project-name> <component> [--max-iterations N]"
+        exit 1
+      fi
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$project" ] || [ -z "$component" ]; then
+  echo "ERROR: Project name and component required."
+  echo "Usage: run-orchestrate <project-name> <component> [--max-iterations N]"
+  exit 1
+fi
+
+# Verify session exists
+if ! tmux has-session -t claude-work 2>/dev/null; then
+  echo "ERROR: claude-work session not found. Run claudework first."
+  exit 1
+fi
+
+project_dir="$HOME/projects/$project"
+
+if [ ! -d "$project_dir" ]; then
+  echo "ERROR: Project directory not found: $project_dir"
+  exit 1
+fi
+
+window_name="orch-${project}-${component}"
+
+# Check if orchestrator window already exists
+if tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -q "^${window_name}$"; then
+  echo "ERROR: Orchestrator already running: $window_name"
+  echo "Use kill-orchestrator $window_name to stop it first."
+  exit 1
+fi
+
+echo "Creating window: $window_name"
+tmux new-window -t claude-work -n "$window_name"
+
+# cd to project directory
+tmux send-keys -t "claude-work:$window_name" "cd $(printf '%q' "$project_dir")" Enter
+sleep 1
+
+# Run orchestrate
+echo "Starting orchestration: $project / $component"
+tmux send-keys -t "claude-work:$window_name" "orchestrate $(printf '%q' "$project") $(printf '%q' "$component") $extra_args" Enter
+
+echo "Done: orchestrator running on window $window_name"

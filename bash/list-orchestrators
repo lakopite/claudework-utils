@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# list-orchestrators: List all orchestrator windows in claude-work session
+# Usage: list-orchestrators
+
+if ! tmux has-session -t claude-work 2>/dev/null; then
+  echo "No claude-work session found"
+  exit 0
+fi
+
+orchestrators=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -E '^orch-' || true)
+
+if [ -z "$orchestrators" ]; then
+  echo "No orchestrators running"
+else
+  echo "Orchestrators:"
+  echo "$orchestrators" | while read -r name; do
+    echo "  $name"
+  done
+fi

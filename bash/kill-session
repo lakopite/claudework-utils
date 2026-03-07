@@ -8,6 +8,17 @@ if ! tmux has-session -t claude-work 2>/dev/null; then
   exit 0
 fi
 
+# Kill all orchestrator windows (no graceful shutdown needed — just bash scripts)
+orchestrators=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -E '^orch-' || true)
+if [ -n "$orchestrators" ]; then
+  for orch in $orchestrators; do
+    echo "Killing orchestrator $orch..."
+    tmux kill-window -t "claude-work:$orch" 2>/dev/null
+  done
+else
+  echo "No orchestrator windows found"
+fi
+
 # Collect all agent windows
 agents=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null | grep -E '^agent-[0-9]+$')
 
