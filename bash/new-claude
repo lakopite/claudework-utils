@@ -47,6 +47,7 @@ name=$(printf "agent-%03d" $n)
 session_name="${name}-${run_id}"
 
 echo "Creating window: $name"
+echo "WINDOW_NAME=$name"
 tmux new-window -t claude-work -n "$name"
 if [ $? -ne 0 ]; then
   echo "ERROR: Failed to create window $name"

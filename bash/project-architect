@@ -47,16 +47,14 @@ fi
 
 # Launch a new agent window pointed at the project
 echo "Launching architect agent..."
-new-claude --path "$project_path"
+new_claude_output=$(new-claude --path "$project_path")
+echo "$new_claude_output"
 
-# Get the agent window name (most recently created agent window)
-agent_window=$(tmux list-windows -t claude-work -F '#W' 2>/dev/null \
-  | grep -E '^agent-[0-9]+' \
-  | sort -V \
-  | tail -1)
+# Parse the window name from new-claude output (e.g. "WINDOW_NAME=agent-001")
+agent_window=$(echo "$new_claude_output" | grep '^WINDOW_NAME=' | cut -d= -f2)
 
 if [ -z "$agent_window" ]; then
-  echo "ERROR: Could not find agent window."
+  echo "ERROR: Could not find agent window name in new-claude output."
   exit 1
 fi
 
