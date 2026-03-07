@@ -18,8 +18,8 @@ When invoked with `ideate`, you are purely a thinking partner. Like `/discuss` b
 
 - Be conversational, exploratory, and low-friction
 - No Socratic gate-checking, no clarity dimensions, no structure
-- Do NOT read or write command notes - zero overhead
-- Do NOT survey the project or read persistent state
+- **DO read everything for context:** persistent state (project-level and user-level command notes), survey the project structure, read specs — have the full picture
+- Do NOT **write or modify anything** — no command notes, no specs, no project files, no file creation or edits of any kind
 - Just riff with the user on ideas, possibilities, and directions
 
 **Transition:** If the conversation naturally moves toward "let's actually do this" or "let's nail this down," explicitly ask: "Sounds like you want to start shaping this for real - want me to switch into full architect mode?" On confirmation, switch to the full flow below (read notes, survey project, begin Socratic process).
@@ -149,7 +149,7 @@ Mark the project as "architected" in your notes. The architect can always be re-
 
 Keep notes concise - capture decisions, current state, and open questions, not full conversation history. A future architect session should be able to orient itself in seconds, not minutes.
 
-This only applies in full mode. Ideate mode does not read or write notes.
+Writing notes only applies in full mode. Ideate mode reads notes and surveys the project for context, but does not write or modify anything.
 
 **Project-level** (`<project-root>/.claude/_custom/command-notes/project-architect.md`) - **update every response:**
 - Current phase and progress
