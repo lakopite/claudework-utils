@@ -2,6 +2,8 @@
 
 Run a project component through an automated convergence loop — the orchestrator agent reads the component's playbook, delegates to role agents, and repeats until work is complete.
 
+**The orchestrate loop runs with `--dangerously-skip-permissions` — the agent operates fully autonomously with no permission prompts.** Ensure your playbooks and role agents are trusted before running.
+
 ## Quick start
 
 ```bash
@@ -29,7 +31,7 @@ run-orchestrate my-app backend-api
 ```
 run-orchestrate          creates tmux window, launches orchestrate
     └─ orchestrate       convergence loop (up to 25 iterations)
-        └─ claude --agent orchestrator -p <component>
+        └─ claude --agent orchestrator --dangerously-skip-permissions -p <component>
             └─ reads playbook, delegates to role agents (planner, developer, judge, etc.)
 ```
 

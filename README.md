@@ -25,7 +25,7 @@ Shell utilities available on the agent user's PATH for managing agent windows wi
 | Script | Description |
 |--------|-------------|
 | `run-orchestrate` | Create a tmux window and run an orchestration loop for a project component. Window named `orch-{project}-{component}`. Fails if already running |
-| `orchestrate` | Convergence loop — runs `claude --agent orchestrator -p` repeatedly, reads sentinel, loops or stops. Meant to run inside a tmux window |
+| `orchestrate` | Convergence loop — runs `claude --agent orchestrator --dangerously-skip-permissions -p` repeatedly, reads sentinel, loops or stops. Meant to run inside a tmux window. **Runs fully unattended with no permission prompts** |
 | `list-orchestrators` | List all `orch-*` windows in the session |
 | `kill-orchestrator` | Kill a specific orchestrator window |
 | `kill-orchestrators` | Kill all orchestrator windows |
@@ -36,7 +36,7 @@ Claude Code agent prompts, installed to `~/.claude/agents/`. These define specia
 
 | Agent | Description |
 |-------|-------------|
-| `orchestrator.md` | Generic playbook executor — reads a project playbook and delegates to project-level role agents. Used by the `orchestrate` bash script in print mode |
+| `orchestrator.md` | Generic playbook executor — reads a project playbook and delegates to project-level role agents. Invoked by `orchestrate` with `--dangerously-skip-permissions` (fully autonomous, no permission prompts) |
 
 ## commands/
 
