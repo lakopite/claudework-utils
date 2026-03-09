@@ -90,7 +90,7 @@ with open('$runs_file', 'r') as f:
 runs.setdefault('$component', {}).setdefault('runs', {})['$run_id'] = {
     'started': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
     'status': 'running',
-    'iterations': {}
+    'iterations': []
 }
 with open('$runs_file', 'w') as f:
     json.dump(runs, f, indent=2)
@@ -116,11 +116,11 @@ while [ "$iteration" -lt "$max_iterations" ]; do
 import json
 with open('$runs_file', 'r') as f:
     runs = json.load(f)
-runs['$component']['runs']['$run_id']['iterations']['$iteration'] = {
+runs['$component']['runs']['$run_id']['iterations'].append({
     'session_id': '$session_id',
     'started': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
     'status': 'running'
-}
+})
 with open('$runs_file', 'w') as f:
     json.dump(runs, f, indent=2)
 "
@@ -151,8 +151,8 @@ with open('$runs_file', 'w') as f:
 import json
 with open('$runs_file', 'r') as f:
     runs = json.load(f)
-runs['$component']['runs']['$run_id']['iterations']['$iteration']['status'] = '$iter_status'
-runs['$component']['runs']['$run_id']['iterations']['$iteration']['finished'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+runs['$component']['runs']['$run_id']['iterations'][-1]['status'] = '$iter_status'
+runs['$component']['runs']['$run_id']['iterations'][-1]['finished'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
 with open('$runs_file', 'w') as f:
     json.dump(runs, f, indent=2)
 "
