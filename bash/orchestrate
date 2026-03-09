@@ -101,6 +101,15 @@ final_status="max-iterations-reached"
 
 while [ "$iteration" -lt "$max_iterations" ]; do
   iteration=$((iteration + 1))
+
+  # Clean up dirty tree from any previous interrupted run (bash or claude)
+  dirty=$(cd "$project_dir" && git status --porcelain 2>/dev/null || true)
+  if [ -n "$dirty" ]; then
+    echo ">>> Dirty working tree detected — stashing before iteration $iteration"
+    cd "$project_dir"
+    git stash push -m "orchestrator: pre-iteration cleanup run $run_id iteration $iteration" --include-untracked 2>/dev/null || true
+  fi
+
   session_id=$(uuidgen)
 
   echo ""
@@ -180,15 +189,9 @@ with open('$runs_file', 'w') as f:
     *)
       echo ""
       echo ">>> No sentinel found (iteration $iteration) — session interrupted"
-      # Stash dirty working tree if present
-      dirty=$(cd "$project_dir" && git status --porcelain 2>/dev/null || true)
-      if [ -n "$dirty" ]; then
-        echo ">>> Stashing uncommitted changes from interrupted session"
-        cd "$project_dir"
-        git stash push -m "orchestrator: interrupted run $run_id iteration $iteration session $session_id" --include-untracked 2>/dev/null || true
-      fi
       # Do NOT clear .inflight — the session ID stays for next run to inspect
-      echo ">>> Continuing loop from clean state"
+      # Dirty tree cleanup happens at top of next iteration
+      echo ">>> Continuing loop"
       ;;
   esac
 done

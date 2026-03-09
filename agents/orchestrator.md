@@ -24,8 +24,8 @@ You receive a single prompt: the name of a component to orchestrate (e.g., "pers
 
 Before executing the playbook, check for interrupted previous sessions:
 
-1. Read `.claude/_custom/orchestrator/.inflight` (if it exists). Each line is a session ID from a previous run that didn't complete cleanly.
-2. If there are inflight session IDs, fire a `session-inspect` agent for each (in parallel if multiple). Pass the project name and session ID so the inspector can locate the logs.
+1. Read `.claude/_custom/orchestrator/.inflight` (if it exists). Each line is a session ID. **Always ignore the last line** — it is the current session (the bash loop appends the current session ID before launching you). All preceding lines are from previous runs that didn't complete cleanly.
+2. If there are inflight session IDs (after excluding the last line), fire a `session-inspect` agent for each (in parallel if multiple). Pass the project name and session ID so the inspector can locate the logs.
 3. Collect the summaries. These become an additional input to the planner — pass them as **inflight summaries** alongside the other reviewer briefs.
 4. The planner will use the summaries to understand what was attempted, where it stopped, and whether to retry or escalate.
 
