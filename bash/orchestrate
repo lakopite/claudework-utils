@@ -8,7 +8,7 @@
 #   orchestrator-converged           <- promotion target (human decides where it goes)
 #     └─ orchestrator-in-progress    <- accumulates judge-passed tasks
 #          └─ orchestrator/feature/{task}     <- one per task
-#               └─ .../attempt-N             <- one per pipeline iteration
+#               └─ ...--attempt-N             <- one per pipeline iteration
 #
 # Responsibility split:
 #   - Bash: convergence loop, sentinel parsing, commits, squash merges, inflight tracking
@@ -136,14 +136,14 @@ squash_merge() {
 }
 
 # Derive feature branch from current attempt branch name
-# orchestrator/feature/task-07-monthly-tick/attempt-2 -> orchestrator/feature/task-07-monthly-tick
+# orchestrator/feature/task-07-monthly-tick--attempt-2 -> orchestrator/feature/task-07-monthly-tick
 get_feature_branch() {
   local current_branch="$1"
-  echo "$current_branch" | sed 's|/attempt-[0-9]*$||'
+  echo "$current_branch" | sed 's|--attempt-[0-9]*$||'
 }
 
 # Extract task ID from branch name
-# orchestrator/feature/task-07-monthly-tick/attempt-2 -> task-07
+# orchestrator/feature/task-07-monthly-tick--attempt-2 -> task-07
 get_task_id_from_branch() {
   local current_branch="$1"
   echo "$current_branch" | sed -n 's|orchestrator/feature/\(task-[0-9]*\)-.*|\1|p'

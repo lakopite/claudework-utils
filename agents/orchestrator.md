@@ -72,7 +72,7 @@ After selecting a task (playbook Step 5) and before analyze/implement steps, set
    - If the planner wrote `[planner] Fresh start — ...`: branch from the feature branch
    - If the planner wrote `[planner] Retry from previous attempt — ...` (or no explicit decision): branch from the most recent attempt branch
    - If no previous attempts exist: branch from the feature branch
-5. **Create and checkout the attempt branch:** `orchestrator/feature/{task-id}-{slug}/attempt-{N}`
+5. **Create and checkout the attempt branch:** `orchestrator/feature/{task-id}-{slug}--attempt-{N}`
 
 Use the Bash tool for all git operations. Keep branch names clean — no spaces, no special characters beyond hyphens.
 
