@@ -97,17 +97,22 @@ with open('$runs_file', 'w') as f:
 "
 
 iteration=0
+prev_status=""
 final_status="max-iterations-reached"
 
 while [ "$iteration" -lt "$max_iterations" ]; do
   iteration=$((iteration + 1))
 
-  # Clean up dirty tree from any previous interrupted run (bash or claude)
-  dirty=$(cd "$project_dir" && git status --porcelain 2>/dev/null || true)
-  if [ -n "$dirty" ]; then
-    echo ">>> Dirty working tree detected — stashing before iteration $iteration"
-    cd "$project_dir"
-    git stash push -m "orchestrator: pre-iteration cleanup run $run_id iteration $iteration" --include-untracked 2>/dev/null || true
+  # Stash dirty tree only after an interrupted run (no sentinel).
+  # After clean exits (continue/complete/blocked), the dirty tree contains
+  # legitimate state like [judge:fail] feedback that the next iteration needs.
+  if [ "$prev_status" = "no-sentinel" ] || [ "$prev_status" = "" ]; then
+    dirty=$(cd "$project_dir" && git status --porcelain 2>/dev/null || true)
+    if [ -n "$dirty" ]; then
+      echo ">>> Dirty working tree from interrupted session — stashing before iteration $iteration"
+      cd "$project_dir"
+      git stash push -m "orchestrator: interrupted cleanup run $run_id iteration $iteration" --include-untracked 2>/dev/null || true
+    fi
   fi
 
   session_id=$(uuidgen)
@@ -194,6 +199,7 @@ with open('$runs_file', 'w') as f:
       echo ">>> Continuing loop"
       ;;
   esac
+  prev_status="$iter_status"
 done
 
 # Update run status
