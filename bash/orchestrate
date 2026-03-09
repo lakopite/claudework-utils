@@ -127,17 +127,16 @@ with open('$runs_file', 'w') as f:
 
   # Run orchestrator agent with explicit session ID
   cd "$project_dir"
+  tmp_out=$(mktemp)
   claude --session-id "$session_id" \
     --agent orchestrator \
     --dangerously-skip-permissions \
-    -p "$component" || true
+    -p "$component" \
+    2>&1 | tee "$tmp_out" || true
 
-  # Extract sentinel from session log
-  session_log="$session_log_dir/$session_id.jsonl"
-  sentinel=""
-  if [ -f "$session_log" ]; then
-    sentinel=$(grep -o 'ORCHESTRATOR_RESULT:[a-z]*' "$session_log" | tail -1 || true)
-  fi
+  # Extract sentinel from stdout capture
+  sentinel=$(grep -o 'ORCHESTRATOR_RESULT:[a-z]*' "$tmp_out" | tail -1 || true)
+  rm -f "$tmp_out"
 
   # Record iteration result
   iter_status="no-sentinel"
