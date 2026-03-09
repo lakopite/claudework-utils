@@ -57,21 +57,48 @@ When the playbook instructs you to read or update the plan:
 - **Write feedback:** Use the Edit tool to append feedback lines under a task's `**feedback:**` section
 - **Mark in-progress:** When you select a task, set its status to `in-progress` before delegating
 
-## Git Commits
+## Git Branch Management
 
-The bash loop handles all git branching, committing, and merging. The orchestrator does NOT commit directly. After emitting a sentinel, the bash loop:
-- Commits all changes to the current attempt branch (regardless of pass/fail)
-- On judge pass: squash merges attempt → feature → in-progress
+You are responsible for creating and checking out task branches. The bash loop starts each iteration on `orchestrator-in-progress` — you move to the correct branch before doing task work.
 
-You do not need to stage, commit, or manage branches. Focus on the pipeline steps.
+### When to Branch
+
+After selecting a task (playbook Step 5) and before analyze/implement steps, set up the task's branch:
+
+1. **Determine the feature branch name:** `orchestrator/feature/{task-id}-{slug}` where slug is a lowercase hyphenated summary of the task title (max 40 chars).
+2. **Create the feature branch** if it doesn't exist: `git branch <feature-branch> orchestrator-in-progress`
+3. **Determine the attempt number:** list existing attempt branches under the feature branch and increment.
+4. **Decide the attempt source** based on the planner's feedback:
+   - If the planner wrote `[planner] Fresh start — ...`: branch from the feature branch
+   - If the planner wrote `[planner] Retry from previous attempt — ...` (or no explicit decision): branch from the most recent attempt branch
+   - If no previous attempts exist: branch from the feature branch
+5. **Create and checkout the attempt branch:** `orchestrator/feature/{task-id}-{slug}/attempt-{N}`
+
+Use the Bash tool for all git operations. Keep branch names clean — no spaces, no special characters beyond hyphens.
+
+### What You Do NOT Do with Git
+
+- **Do not commit.** The bash loop commits all changes after every sentinel.
+- **Do not merge.** The bash loop handles squash merges based on the sentinel you emit.
+- **Do not delete branches.** Attempt branches are the audit trail.
+
+### Convergence Runs
+
+When the playbook reaches the convergence gate (no tasks remaining), stay on `orchestrator-in-progress` — no task branch needed. The bash loop handles the in-progress → converged merge on `complete` sentinel.
 
 ## Sentinel Convention
 
 Emit exactly one of these as the **very last line** of your response:
 
-- `ORCHESTRATOR_RESULT:continue` — work was done or new work was created; the loop should re-run
-- `ORCHESTRATOR_RESULT:complete` — convergence achieved; all work done and validated
-- `ORCHESTRATOR_RESULT:blocked` — something needs human attention; the loop should stop
+- `ORCHESTRATOR_RESULT:continue` — work was done, task not finished; bash commits only
+- `ORCHESTRATOR_RESULT:continue:done` — judge passed, task complete; bash commits then squash merges attempt → feature → in-progress
+- `ORCHESTRATOR_RESULT:complete` — convergence achieved; bash commits then merges in-progress → converged
+- `ORCHESTRATOR_RESULT:blocked` — something needs human attention; bash commits and stops
+
+**Choosing between `continue` and `continue:done`:**
+- After a judge **pass** (task marked done): emit `continue:done`
+- After a judge **fail**, analyzer escape valve, or any other non-completion: emit `continue`
+- After creating new tasks from QA lead feedback at convergence: emit `continue`
 
 **Before emitting `blocked`:** Output a summary of all blocked tasks and their feedback history.
 
