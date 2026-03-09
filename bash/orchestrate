@@ -3,6 +3,14 @@
 # orchestrate: Run an orchestrated workflow convergence loop for a project component
 # Usage: orchestrate <project-name> <component> [--max-iterations N]
 # Meant to be run inside a tmux window (via run-orchestrate or manually)
+#
+# Bookkeeping:
+#   - Generates a run UUID grouping all iterations
+#   - Generates a session UUID per iteration, passed to claude via --session-id
+#   - Writes run/iteration/session mapping to orchestrator-runs.json
+#   - Manages .inflight file (current session ID while claude is running)
+#   - On interrupted runs (no sentinel): stashes dirty working tree, continues loop
+#   - Session logs live in ~/.claude/projects/ — no tee duplication
 
 set -euo pipefail
 
@@ -49,72 +57,162 @@ if [ ! -d "$project_dir" ]; then
   exit 1
 fi
 
-# Create log directory
-log_dir="$project_dir/orchestrator-logs"
-mkdir -p "$log_dir"
+# Paths
+orch_dir="$project_dir/.claude/_custom/orchestrator"
+runs_file="$orch_dir/runs.json"
+inflight_file="$orch_dir/.inflight"
+mkdir -p "$orch_dir"
+
+# Encode project path the way claude does (slashes -> dashes)
+claude_project_path=$(echo "$project_dir" | sed 's|^/||; s|/|-|g')
+session_log_dir="$HOME/.claude/projects/-${claude_project_path}"
+
+# Initialize runs file if it doesn't exist
+if [ ! -f "$runs_file" ]; then
+  echo '{}' > "$runs_file"
+fi
+
+# Generate run UUID
+run_id=$(uuidgen)
 
 echo "========================================"
 echo "Orchestrator: $project / $component"
+echo "Run: $run_id"
 echo "Max iterations: $max_iterations"
-echo "Logs: $log_dir"
 echo "========================================"
+
+# Initialize this run in the runs file
+# Uses python for reliable JSON manipulation (available in any python project)
+python3 -c "
+import json, sys
+with open('$runs_file', 'r') as f:
+    runs = json.load(f)
+runs.setdefault('$component', {}).setdefault('runs', {})['$run_id'] = {
+    'started': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'status': 'running',
+    'iterations': {}
+}
+with open('$runs_file', 'w') as f:
+    json.dump(runs, f, indent=2)
+"
 
 iteration=0
 final_status="max-iterations-reached"
 
 while [ "$iteration" -lt "$max_iterations" ]; do
   iteration=$((iteration + 1))
-  log_file="$log_dir/iteration-$(printf '%03d' $iteration).log"
+  session_id=$(uuidgen)
 
   echo ""
   echo "--- Iteration $iteration / $max_iterations ---"
-  echo "Log: $log_file"
+  echo "Session: $session_id"
   echo ""
 
-  # Run orchestrator agent in print mode, capture output
+  # Write session ID to .inflight before starting claude
+  echo "$session_id" >> "$inflight_file"
+
+  # Record iteration in runs file
+  python3 -c "
+import json
+with open('$runs_file', 'r') as f:
+    runs = json.load(f)
+runs['$component']['runs']['$run_id']['iterations']['$iteration'] = {
+    'session_id': '$session_id',
+    'started': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'status': 'running'
+}
+with open('$runs_file', 'w') as f:
+    json.dump(runs, f, indent=2)
+"
+
+  # Run orchestrator agent with explicit session ID
   cd "$project_dir"
-  claude --agent orchestrator \
+  claude --session-id "$session_id" \
+    --agent orchestrator \
     --dangerously-skip-permissions \
-    -p "$component" \
-    2>&1 | tee "$log_file" || true
+    -p "$component" || true
 
-  # Extract sentinel from output
-  sentinel=$(grep -o 'ORCHESTRATOR_RESULT:[a-z]*' "$log_file" | tail -1 || true)
+  # Extract sentinel from session log
+  session_log="$session_log_dir/$session_id.jsonl"
+  sentinel=""
+  if [ -f "$session_log" ]; then
+    sentinel=$(grep -o 'ORCHESTRATOR_RESULT:[a-z]*' "$session_log" | tail -1 || true)
+  fi
 
+  # Record iteration result
+  iter_status="no-sentinel"
   case "$sentinel" in
-    ORCHESTRATOR_RESULT:continue)
+    ORCHESTRATOR_RESULT:continue) iter_status="continue" ;;
+    ORCHESTRATOR_RESULT:complete) iter_status="complete" ;;
+    ORCHESTRATOR_RESULT:blocked)  iter_status="blocked" ;;
+  esac
+
+  python3 -c "
+import json
+with open('$runs_file', 'r') as f:
+    runs = json.load(f)
+runs['$component']['runs']['$run_id']['iterations']['$iteration']['status'] = '$iter_status'
+runs['$component']['runs']['$run_id']['iterations']['$iteration']['finished'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+with open('$runs_file', 'w') as f:
+    json.dump(runs, f, indent=2)
+"
+
+  case "$iter_status" in
+    continue)
       echo ""
       echo ">>> Sentinel: continue (iteration $iteration)"
+      # Clean exit — clear .inflight
+      rm -f "$inflight_file"
       ;;
-    ORCHESTRATOR_RESULT:complete)
+    complete)
       echo ""
       echo ">>> Sentinel: complete (iteration $iteration)"
+      rm -f "$inflight_file"
       final_status="complete"
       break
       ;;
-    ORCHESTRATOR_RESULT:blocked)
+    blocked)
       echo ""
       echo ">>> Sentinel: blocked (iteration $iteration)"
+      rm -f "$inflight_file"
       final_status="blocked"
       break
       ;;
     *)
       echo ""
-      echo ">>> ERROR: No valid sentinel found (iteration $iteration)"
-      final_status="no-sentinel"
-      break
+      echo ">>> No sentinel found (iteration $iteration) — session interrupted"
+      # Stash dirty working tree if present
+      dirty=$(cd "$project_dir" && git status --porcelain 2>/dev/null || true)
+      if [ -n "$dirty" ]; then
+        echo ">>> Stashing uncommitted changes from interrupted session"
+        cd "$project_dir"
+        git stash push -m "orchestrator: interrupted run $run_id iteration $iteration session $session_id" --include-untracked 2>/dev/null || true
+      fi
+      # Do NOT clear .inflight — the session ID stays for next run to inspect
+      echo ">>> Continuing loop from clean state"
       ;;
   esac
 done
+
+# Update run status
+python3 -c "
+import json
+with open('$runs_file', 'r') as f:
+    runs = json.load(f)
+runs['$component']['runs']['$run_id']['status'] = '$final_status'
+runs['$component']['runs']['$run_id']['finished'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+with open('$runs_file', 'w') as f:
+    json.dump(runs, f, indent=2)
+"
 
 echo ""
 echo "========================================"
 echo "Orchestrator finished"
 echo "  Project: $project"
 echo "  Component: $component"
+echo "  Run: $run_id"
 echo "  Iterations: $iteration"
 echo "  Status: $final_status"
-echo "  Logs: $log_dir"
 echo "========================================"
 
 case "$final_status" in

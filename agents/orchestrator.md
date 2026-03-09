@@ -17,7 +17,19 @@ You receive a single prompt: the name of a component to orchestrate (e.g., "pers
 
 1. Read the project's CLAUDE.md to understand structure and conventions.
 2. Find the component's playbook using project conventions (glob for it if needed).
-3. Read the playbook and execute its steps.
+3. **Check for interrupted sessions** (see Inflight Recovery below).
+4. Read the playbook and execute its steps.
+
+## Inflight Recovery
+
+Before executing the playbook, check for interrupted previous sessions:
+
+1. Read `.claude/_custom/orchestrator/.inflight` (if it exists). Each line is a session ID from a previous run that didn't complete cleanly.
+2. If there are inflight session IDs, fire a `session-inspect` agent for each (in parallel if multiple). Pass the project name and session ID so the inspector can locate the logs.
+3. Collect the summaries. These become an additional input to the planner — pass them as **inflight summaries** alongside the other reviewer briefs.
+4. The planner will use the summaries to understand what was attempted, where it stopped, and whether to retry or escalate.
+
+**Do NOT clear the `.inflight` file.** The bash loop manages it — it clears the file after a clean sentinel.
 
 ## Core Behavior
 
