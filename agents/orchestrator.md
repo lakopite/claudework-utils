@@ -59,10 +59,11 @@ When the playbook instructs you to read or update the plan:
 
 ## Git Commits
 
-When the playbook instructs you to commit (e.g., after a judge pass):
-- Stage the relevant files (implementation code + test files written this run)
-- Commit with a descriptive message referencing the task
-- Do NOT push
+The bash loop handles all git branching, committing, and merging. The orchestrator does NOT commit directly. After emitting a sentinel, the bash loop:
+- Commits all changes to the current attempt branch (regardless of pass/fail)
+- On judge pass: squash merges attempt → feature → in-progress
+
+You do not need to stage, commit, or manage branches. Focus on the pipeline steps.
 
 ## Sentinel Convention
 

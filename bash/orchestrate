@@ -4,12 +4,18 @@
 # Usage: orchestrate <project-name> <component> [--max-iterations N]
 # Meant to be run inside a tmux window (via run-orchestrate or manually)
 #
+# Git Branch Strategy:
+#   orchestrator-converged           <- promotion target (human decides where it goes)
+#     └─ orchestrator-in-progress    <- accumulates judge-passed tasks
+#          └─ orchestrator/feature/{task}     <- one per task
+#               └─ .../attempt-N             <- one per pipeline iteration
+#
 # Bookkeeping:
 #   - Generates a run UUID grouping all iterations
 #   - Generates a session UUID per iteration, passed to claude via --session-id
 #   - Writes run/iteration/session mapping to orchestrator-runs.json
 #   - Manages .inflight file (current session ID while claude is running)
-#   - On interrupted runs (no sentinel): stashes dirty working tree, continues loop
+#   - On interrupted runs (no sentinel): dirty worktree stays on attempt branch for inspection
 #   - Session logs live in ~/.claude/projects/ — no tee duplication
 
 set -euo pipefail
@@ -81,8 +87,100 @@ echo "Run: $run_id"
 echo "Max iterations: $max_iterations"
 echo "========================================"
 
-# Initialize this run in the runs file
-# Uses python for reliable JSON manipulation (available in any python project)
+# --- Git Branch Setup ---
+
+cd "$project_dir"
+
+# Ensure base branches exist
+if ! git rev-parse --verify orchestrator-converged >/dev/null 2>&1; then
+  echo ">>> Creating orchestrator-converged branch from current HEAD"
+  git branch orchestrator-converged HEAD
+fi
+
+if ! git rev-parse --verify orchestrator-in-progress >/dev/null 2>&1; then
+  echo ">>> Creating orchestrator-in-progress branch from orchestrator-converged"
+  git branch orchestrator-in-progress orchestrator-converged
+fi
+
+# Start on orchestrator-in-progress
+git checkout orchestrator-in-progress
+
+# --- Helper Functions ---
+
+# Get the current task from the plan file (first pending/failed/in-progress task)
+get_current_task() {
+  local plan_file="$1"
+  if [ ! -f "$plan_file" ]; then
+    echo ""
+    return
+  fi
+  # Extract first task that is pending, failed, or in-progress
+  python3 -c "
+import re, sys
+with open('$plan_file') as f:
+    content = f.read()
+# Find task headers and their statuses
+for m in re.finditer(r'### (task-\d+): (.+)\n- \*\*status:\*\* (\w+)', content):
+    task_id, title, status = m.group(1), m.group(2), m.group(3)
+    if status in ('pending', 'failed', 'in-progress'):
+        # Create a slug from title
+        slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:40]
+        print(f'{task_id}|{slug}|{status}')
+        break
+" 2>/dev/null || echo ""
+}
+
+# Check if planner says to start fresh or continue from previous attempt
+should_start_fresh() {
+  local plan_file="$1"
+  local task_id="$2"
+  if [ ! -f "$plan_file" ]; then
+    echo "false"
+    return
+  fi
+  python3 -c "
+import re
+with open('$plan_file') as f:
+    content = f.read()
+# Find the task section and look for 'Fresh start' in planner feedback
+task_pattern = r'### ${task_id}:.*?(?=### task-|\Z)'
+m = re.search(task_pattern, content, re.DOTALL)
+if m:
+    section = m.group(0)
+    if '[planner] Fresh start' in section:
+        print('true')
+    else:
+        print('false')
+else:
+    print('false')
+" 2>/dev/null || echo "false"
+}
+
+# Commit all changes on current branch
+commit_attempt() {
+  local message="$1"
+  cd "$project_dir"
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    git add -A
+    git commit -m "$message" --no-gpg-sign 2>/dev/null || true
+  fi
+}
+
+# Squash merge source into target
+squash_merge() {
+  local source="$1"
+  local target="$2"
+  local message="$3"
+  cd "$project_dir"
+  git checkout "$target"
+  git merge --squash "$source" 2>/dev/null || true
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    git commit -m "$message" --no-gpg-sign 2>/dev/null || true
+  fi
+}
+
+# --- Initialize Run ---
+
 python3 -c "
 import json, sys
 with open('$runs_file', 'r') as f:
@@ -96,30 +194,102 @@ with open('$runs_file', 'w') as f:
     json.dump(runs, f, indent=2)
 "
 
+# --- Main Loop ---
+
 iteration=0
 prev_status=""
 final_status="max-iterations-reached"
+current_feature_branch=""
+current_attempt=0
 
 while [ "$iteration" -lt "$max_iterations" ]; do
   iteration=$((iteration + 1))
 
-  # Stash dirty tree only after an interrupted run (no sentinel).
-  # After clean exits (continue/complete/blocked), the dirty tree contains
-  # legitimate state like [judge:fail] feedback that the next iteration needs.
-  if [ "$prev_status" = "no-sentinel" ] || [ "$prev_status" = "" ]; then
-    dirty=$(cd "$project_dir" && git status --porcelain 2>/dev/null || true)
+  cd "$project_dir"
+
+  # --- Dirty Worktree Check ---
+  # Only relevant when previous iteration had no sentinel (interrupted)
+  if [ "$prev_status" = "no-sentinel" ]; then
+    dirty=$(git status --porcelain 2>/dev/null || true)
     if [ -n "$dirty" ]; then
-      echo ">>> Dirty working tree from interrupted session — stashing before iteration $iteration"
-      cd "$project_dir"
-      git stash push -m "orchestrator: interrupted cleanup run $run_id iteration $iteration" --include-untracked 2>/dev/null || true
+      echo ">>> Dirty worktree on attempt branch from interrupted session"
+      echo ">>> Committing interrupted state for inspection"
+      commit_attempt "orchestrator: interrupted state from run $run_id iteration $((iteration - 1))"
     fi
   fi
+
+  # --- Determine Task and Branches ---
+
+  # Read plan to find the current task
+  # Look for plan file using playbook convention
+  plan_file=""
+  for candidate in "playbooks/packages/${component}.plan.md" "playbooks/${component}.plan.md"; do
+    if [ -f "$project_dir/$candidate" ]; then
+      plan_file="$project_dir/$candidate"
+      break
+    fi
+  done
+
+  task_info=$(get_current_task "$plan_file")
+
+  if [ -n "$task_info" ]; then
+    task_id=$(echo "$task_info" | cut -d'|' -f1)
+    task_slug=$(echo "$task_info" | cut -d'|' -f2)
+    task_status=$(echo "$task_info" | cut -d'|' -f3)
+    feature_branch="orchestrator/feature/${task_id}-${task_slug}"
+
+    # Create feature branch if it doesn't exist
+    if ! git rev-parse --verify "$feature_branch" >/dev/null 2>&1; then
+      echo ">>> Creating feature branch: $feature_branch"
+      git branch "$feature_branch" orchestrator-in-progress
+      current_attempt=0
+    fi
+
+    # Determine attempt source
+    current_attempt=$((current_attempt + 1))
+    attempt_branch="${feature_branch}/attempt-${current_attempt}"
+
+    if [ "$task_status" = "failed" ]; then
+      fresh=$(should_start_fresh "$plan_file" "$task_id")
+      prev_attempt="${feature_branch}/attempt-$((current_attempt - 1))"
+
+      if [ "$fresh" = "true" ]; then
+        echo ">>> Fresh start: branching attempt-${current_attempt} from feature branch"
+        git checkout "$feature_branch"
+        git checkout -b "$attempt_branch"
+      elif git rev-parse --verify "$prev_attempt" >/dev/null 2>&1; then
+        echo ">>> Continuing: branching attempt-${current_attempt} from attempt-$((current_attempt - 1))"
+        git checkout "$prev_attempt"
+        git checkout -b "$attempt_branch"
+      else
+        echo ">>> No previous attempt found, branching from feature branch"
+        git checkout "$feature_branch"
+        git checkout -b "$attempt_branch"
+      fi
+    else
+      # New task or pending — branch from feature
+      echo ">>> Creating attempt branch: attempt-${current_attempt}"
+      git checkout "$feature_branch"
+      git checkout -b "$attempt_branch"
+    fi
+
+    current_feature_branch="$feature_branch"
+  else
+    # No task found — might be convergence check, stay on in-progress
+    git checkout orchestrator-in-progress
+  fi
+
+  # --- Run Orchestrator Agent ---
 
   session_id=$(uuidgen)
 
   echo ""
   echo "--- Iteration $iteration / $max_iterations ---"
   echo "Session: $session_id"
+  if [ -n "$task_info" ]; then
+    echo "Task: $task_id ($task_slug)"
+    echo "Branch: $attempt_branch"
+  fi
   echo ""
 
   # Write session ID to .inflight before starting claude
@@ -133,6 +303,8 @@ with open('$runs_file', 'r') as f:
 runs['$component']['runs']['$run_id']['iterations'].append({
     'session_id': '$session_id',
     'started': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'task': '${task_id:-convergence-check}',
+    'branch': '${attempt_branch:-orchestrator-in-progress}',
     'status': 'running'
 })
 with open('$runs_file', 'w') as f:
@@ -170,17 +342,46 @@ with open('$runs_file', 'w') as f:
     json.dump(runs, f, indent=2)
 "
 
+  # --- Post-Iteration Git Management ---
+
   case "$iter_status" in
     continue)
       echo ""
       echo ">>> Sentinel: continue (iteration $iteration)"
-      # Clean exit — clear .inflight
       rm -f "$inflight_file"
+
+      # Commit all changes to attempt branch
+      cd "$project_dir"
+      commit_attempt "orchestrator: ${task_id:-unknown} attempt-${current_attempt} (run $run_id iter $iteration)"
+
+      # Check if judge passed by looking at plan file for task status = done
+      if [ -n "$plan_file" ] && [ -n "$task_id" ]; then
+        task_done=$(python3 -c "
+import re
+with open('$plan_file') as f:
+    content = f.read()
+m = re.search(r'### ${task_id}:.*?- \*\*status:\*\* (\w+)', content, re.DOTALL)
+if m and m.group(1) == 'done':
+    print('true')
+else:
+    print('false')
+" 2>/dev/null || echo "false")
+
+        if [ "$task_done" = "true" ]; then
+          echo ">>> Judge passed — merging attempt → feature → in-progress"
+          squash_merge "$attempt_branch" "$current_feature_branch" "${task_id}: judge pass (squash from attempt-${current_attempt})"
+          squash_merge "$current_feature_branch" "orchestrator-in-progress" "${task_id}: complete"
+          git checkout orchestrator-in-progress
+          current_feature_branch=""
+          current_attempt=0
+        fi
+      fi
       ;;
     complete)
       echo ""
       echo ">>> Sentinel: complete (iteration $iteration)"
       rm -f "$inflight_file"
+      commit_attempt "orchestrator: convergence complete (run $run_id)"
       final_status="complete"
       break
       ;;
@@ -188,6 +389,7 @@ with open('$runs_file', 'w') as f:
       echo ""
       echo ">>> Sentinel: blocked (iteration $iteration)"
       rm -f "$inflight_file"
+      commit_attempt "orchestrator: blocked (run $run_id iter $iteration)"
       final_status="blocked"
       break
       ;;
@@ -195,7 +397,7 @@ with open('$runs_file', 'w') as f:
       echo ""
       echo ">>> No sentinel found (iteration $iteration) — session interrupted"
       # Do NOT clear .inflight — the session ID stays for next run to inspect
-      # Dirty tree cleanup happens at top of next iteration
+      # Dirty worktree stays on attempt branch — handled at top of next iteration
       echo ">>> Continuing loop"
       ;;
   esac
