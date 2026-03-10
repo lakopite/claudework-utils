@@ -189,6 +189,9 @@ while [ "$iteration" -lt "$max_iterations" ]; do
   # Start each iteration on orchestrator-in-progress
   # The orchestrator agent will checkout the appropriate task branch
   git checkout orchestrator-in-progress
+  # Merge main so in-progress always reflects current state (e.g. post-convergence
+  # hotfixes). No-op when already in sync; prevents merge conflicts at convergence.
+  git merge main --no-edit
 
   # --- Run Orchestrator Agent ---
 
