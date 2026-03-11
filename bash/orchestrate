@@ -4,23 +4,25 @@
 # Usage: orchestrate <project-name> <component> [--max-iterations N]
 # Meant to be run inside a tmux window (via run-orchestrate or manually)
 #
-# Git Branch Strategy:
-#   orchestrator-converged           <- promotion target (human decides where it goes)
-#     └─ orchestrator-in-progress    <- accumulates judge-passed tasks
-#          └─ orchestrator/feature/{task}     <- one per task
-#               └─ ...--attempt-N             <- one per pipeline iteration
+# Repo structure:
+#   Project repo (parent)    <- metadata: specs, playbooks, plans, agents. Always on main.
+#   └─ submodule(s)          <- code: feature branches, attempt branches, convergence branches.
 #
 # Responsibility split:
-#   - Bash: convergence loop, sentinel parsing, commits, squash merges, inflight tracking
-#   - Orchestrator agent: branch creation/checkout (knows task context)
-#   - Sentinel protocol encodes what git action bash should take post-iteration
+#   - Bash: convergence loop, sentinel parsing, inflight tracking, run bookkeeping
+#   - Orchestrator agent: ALL git operations (both repos), branch management, commits, merges
+#
+# Sentinels (loop control only):
+#   - continue  — keep looping
+#   - complete  — stop, exit 0
+#   - blocked   — stop, exit 1
+#   - (missing) — stop, exit 1 (agent crashed or hit session limit)
 #
 # Bookkeeping:
 #   - Generates a run UUID grouping all iterations
 #   - Generates a session UUID per iteration, passed to claude via --session-id
 #   - Writes run/iteration/session mapping to orchestrator-runs.json
 #   - Manages .inflight file (current session ID while claude is running)
-#   - On interrupted runs (no sentinel): dirty worktree stays for inspection
 #   - Session logs live in ~/.claude/projects/ — no tee duplication
 
 set -euo pipefail
@@ -74,10 +76,6 @@ runs_file="$orch_dir/runs.json"
 inflight_file="$orch_dir/.inflight"
 mkdir -p "$orch_dir"
 
-# Encode project path the way claude does (slashes -> dashes)
-claude_project_path=$(echo "$project_dir" | sed 's|^/||; s|/|-|g')
-session_log_dir="$HOME/.claude/projects/-${claude_project_path}"
-
 # Initialize runs file if it doesn't exist
 if [ ! -f "$runs_file" ]; then
   echo '{}' > "$runs_file"
@@ -92,62 +90,7 @@ echo "Run: $run_id"
 echo "Max iterations: $max_iterations"
 echo "========================================"
 
-# --- Git Branch Setup ---
-
 cd "$project_dir"
-
-# Ensure base branches exist
-if ! git rev-parse --verify orchestrator-converged >/dev/null 2>&1; then
-  echo ">>> Creating orchestrator-converged branch from current HEAD"
-  git branch orchestrator-converged HEAD
-fi
-
-if ! git rev-parse --verify orchestrator-in-progress >/dev/null 2>&1; then
-  echo ">>> Creating orchestrator-in-progress branch from orchestrator-converged"
-  git branch orchestrator-in-progress orchestrator-converged
-fi
-
-# Start on orchestrator-in-progress
-git checkout orchestrator-in-progress
-
-# --- Helper Functions ---
-
-# Commit all changes on current branch
-commit_attempt() {
-  local message="$1"
-  cd "$project_dir"
-  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-    git add -A
-    git commit -m "$message" --no-gpg-sign 2>/dev/null || true
-  fi
-}
-
-# Squash merge source into target
-squash_merge() {
-  local source="$1"
-  local target="$2"
-  local message="$3"
-  cd "$project_dir"
-  git checkout "$target"
-  git merge --squash "$source" 2>/dev/null || true
-  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-    git commit -m "$message" --no-gpg-sign 2>/dev/null || true
-  fi
-}
-
-# Derive feature branch from current attempt branch name
-# orchestrator/feature/task-07-monthly-tick--attempt-2 -> orchestrator/feature/task-07-monthly-tick
-get_feature_branch() {
-  local current_branch="$1"
-  echo "$current_branch" | sed 's|--attempt-[0-9]*$||'
-}
-
-# Extract task ID from branch name
-# orchestrator/feature/task-07-monthly-tick--attempt-2 -> task-07
-get_task_id_from_branch() {
-  local current_branch="$1"
-  echo "$current_branch" | sed -n 's|orchestrator/feature/\(task-[0-9]*\)-.*|\1|p'
-}
 
 # --- Initialize Run ---
 
@@ -167,31 +110,12 @@ with open('$runs_file', 'w') as f:
 # --- Main Loop ---
 
 iteration=0
-prev_status=""
 final_status="max-iterations-reached"
 
 while [ "$iteration" -lt "$max_iterations" ]; do
   iteration=$((iteration + 1))
 
   cd "$project_dir"
-
-  # --- Dirty Worktree Check ---
-  # Only relevant when previous iteration had no sentinel (interrupted)
-  if [ "$prev_status" = "no-sentinel" ]; then
-    dirty=$(git status --porcelain 2>/dev/null || true)
-    if [ -n "$dirty" ]; then
-      echo ">>> Dirty worktree from interrupted session"
-      echo ">>> Committing interrupted state for inspection"
-      commit_attempt "orchestrator: interrupted state from run $run_id iteration $((iteration - 1))"
-    fi
-  fi
-
-  # Start each iteration on orchestrator-in-progress
-  # The orchestrator agent will checkout the appropriate task branch
-  git checkout orchestrator-in-progress
-  # Merge main so in-progress always reflects current state (e.g. post-convergence
-  # hotfixes). No-op when already in sync; prevents merge conflicts at convergence.
-  git merge main --no-edit
 
   # --- Run Orchestrator Agent ---
 
@@ -229,77 +153,39 @@ with open('$runs_file', 'w') as f:
     2>&1 | tee "$tmp_out" || true
 
   # Extract sentinel from stdout capture
-  # Matches: continue, continue:done, complete, blocked
   sentinel=$(grep -o 'ORCHESTRATOR_RESULT:[a-z:]*' "$tmp_out" | tail -1 || true)
   rm -f "$tmp_out"
 
   # Record iteration result
   iter_status="no-sentinel"
   case "$sentinel" in
-    ORCHESTRATOR_RESULT:continue)      iter_status="continue" ;;
-    ORCHESTRATOR_RESULT:continue:done) iter_status="continue:done" ;;
-    ORCHESTRATOR_RESULT:complete)      iter_status="complete" ;;
-    ORCHESTRATOR_RESULT:blocked)       iter_status="blocked" ;;
+    ORCHESTRATOR_RESULT:continue) iter_status="continue" ;;
+    ORCHESTRATOR_RESULT:complete) iter_status="complete" ;;
+    ORCHESTRATOR_RESULT:blocked)  iter_status="blocked" ;;
   esac
-
-  # Capture what branch the orchestrator left us on
-  current_branch=$(git branch --show-current 2>/dev/null || echo "orchestrator-in-progress")
 
   python3 -c "
 import json
 with open('$runs_file', 'r') as f:
     runs = json.load(f)
 runs['$component']['runs']['$run_id']['iterations'][-1]['status'] = '$iter_status'
-runs['$component']['runs']['$run_id']['iterations'][-1]['branch'] = '$current_branch'
 runs['$component']['runs']['$run_id']['iterations'][-1]['finished'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
 with open('$runs_file', 'w') as f:
     json.dump(runs, f, indent=2)
 "
 
-  # --- Post-Iteration Git Management ---
+  # --- Post-Iteration ---
 
   case "$iter_status" in
     continue)
       echo ""
       echo ">>> Sentinel: continue (iteration $iteration)"
       rm -f "$inflight_file"
-
-      # Commit all changes on whatever branch the orchestrator left us on
-      commit_attempt "orchestrator: iteration $iteration (run $run_id)"
-      ;;
-    continue:done)
-      echo ""
-      echo ">>> Sentinel: continue:done (iteration $iteration)"
-      rm -f "$inflight_file"
-
-      # Commit all changes to the attempt branch
-      commit_attempt "orchestrator: iteration $iteration (run $run_id)"
-
-      # Squash merge attempt → feature → in-progress
-      feature_branch=$(get_feature_branch "$current_branch")
-      task_id=$(get_task_id_from_branch "$current_branch")
-
-      if [ -n "$feature_branch" ] && [ -n "$task_id" ]; then
-        echo ">>> Judge passed — merging attempt → feature → in-progress"
-        squash_merge "$current_branch" "$feature_branch" "${task_id}: judge pass (squash from ${current_branch##*/})"
-        squash_merge "$feature_branch" "orchestrator-in-progress" "${task_id}: complete"
-        git checkout orchestrator-in-progress
-      else
-        echo ">>> WARNING: Could not derive merge targets from branch: $current_branch"
-        echo ">>> Skipping squash merge — changes committed on $current_branch"
-      fi
       ;;
     complete)
       echo ""
       echo ">>> Sentinel: complete (iteration $iteration)"
       rm -f "$inflight_file"
-      commit_attempt "orchestrator: convergence complete (run $run_id)"
-
-      # Merge in-progress → converged
-      echo ">>> Convergence — merging in-progress → converged"
-      git checkout orchestrator-in-progress
-      squash_merge "orchestrator-in-progress" "orchestrator-converged" "convergence: run $run_id"
-
       final_status="complete"
       break
       ;;
@@ -307,19 +193,17 @@ with open('$runs_file', 'w') as f:
       echo ""
       echo ">>> Sentinel: blocked (iteration $iteration)"
       rm -f "$inflight_file"
-      commit_attempt "orchestrator: blocked (run $run_id iter $iteration)"
       final_status="blocked"
       break
       ;;
     *)
       echo ""
-      echo ">>> No sentinel found (iteration $iteration) — session interrupted"
+      echo ">>> No sentinel found (iteration $iteration) — agent crashed or hit session limit"
       # Do NOT clear .inflight — the session ID stays for next run to inspect
-      # Dirty worktree stays — handled at top of next iteration
-      echo ">>> Continuing loop"
+      final_status="no-sentinel"
+      break
       ;;
   esac
-  prev_status="$iter_status"
 done
 
 # Update run status

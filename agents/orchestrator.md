@@ -17,8 +17,19 @@ You receive a single prompt: the name of a component to orchestrate (e.g., "pers
 
 1. Read the project's CLAUDE.md to understand structure and conventions.
 2. Find the component's playbook using project conventions (glob for it if needed).
-3. **Check for interrupted sessions** (see Inflight Recovery below).
-4. Read the playbook and execute its steps.
+3. **Locate the component's submodule** (see Repo Structure below).
+4. **Check for interrupted sessions** (see Inflight Recovery below).
+5. **Perform startup git operations** (see Git Operations below).
+6. Read the playbook and execute its steps.
+
+## Repo Structure
+
+The project uses a two-repo structure:
+
+- **Parent repo** (project root) — metadata: specs, playbooks, plan files, agent definitions, `.claude/` config. Always on `main`. Never has feature branches.
+- **Component submodule(s)** — code: implementation and tests. Has `main`, `orchestrator-converged`, `orchestrator-in-progress`, and feature/attempt branches.
+
+After reading CLAUDE.md, locate the component's submodule path. Use `.gitmodules` or project conventions to find it (e.g., `packages/{component}/` or `apps/{component}/`). All code-related git operations happen inside the submodule directory. All metadata operations happen in the parent repo on `main`.
 
 ## Inflight Recovery
 
@@ -28,6 +39,7 @@ Before executing the playbook, check for interrupted previous sessions:
 2. If there are inflight session IDs (after excluding the last line), fire a `session-inspect` agent for each (in parallel if multiple). Pass the project name and session ID so the inspector can locate the logs.
 3. Collect the summaries. These become an additional input to the planner — pass them as **inflight summaries** alongside the other reviewer briefs.
 4. The planner will use the summaries to understand what was attempted, where it stopped, and whether to retry or escalate.
+5. **Check for dirty worktrees** in both the parent repo and the submodule. If either has uncommitted changes from a crashed session, commit them (parent on `main`, submodule on whatever branch is checked out) with message: `"orchestrator: interrupted state recovery"`. This preserves the crashed session's work for the planner to assess.
 
 **Do NOT clear the `.inflight` file.** The bash loop manages it — it clears the file after a clean sentinel.
 
@@ -39,7 +51,8 @@ Before executing the playbook, check for interrupted previous sessions:
 4. **Pass context forward.** When a step produces output needed by a later step (e.g., test summary for the planner), hold it in context and include it in the later agent's prompt.
 5. **Handle conditionals.** When the playbook says "if X, do Y," evaluate the condition from available context (plan file contents, agent responses, test output) and branch accordingly.
 6. **Fire parallel Agent calls** when the playbook specifies parallel steps — send both Agent tool calls simultaneously.
-7. **Emit exactly one sentinel line** as the very last line of your final response.
+7. **Perform end-of-iteration git operations** (see Git Operations below).
+8. **Emit exactly one sentinel line** as the very last line of your final response.
 
 ## Agent Delegation
 
@@ -57,13 +70,24 @@ When the playbook instructs you to read or update the plan:
 - **Write feedback:** Use the Edit tool to append feedback lines under a task's `**feedback:**` section
 - **Mark in-progress:** When you select a task, set its status to `in-progress` before delegating
 
-## Git Branch Management
+## Git Operations
 
-You are responsible for creating and checking out task branches. The bash loop starts each iteration on `orchestrator-in-progress` — you move to the correct branch before doing task work.
+You are responsible for ALL git operations in both the parent repo and the component submodule. The bash loop does NO git operations — it only parses sentinels and manages bookkeeping files.
 
-### When to Branch
+### Startup (every iteration)
 
-After selecting a task (playbook Step 5) and before analyze/implement steps, set up the task's branch:
+Run these before executing the playbook pipeline:
+
+1. **Parent repo:** Verify you are on `main`. If not, checkout `main`.
+2. **Submodule:** Ensure base branches exist:
+   - If `orchestrator-converged` doesn't exist, create it from `main`
+   - If `orchestrator-in-progress` doesn't exist, create it from `orchestrator-converged`
+3. **Submodule:** Checkout `orchestrator-in-progress`.
+4. **Submodule:** Merge `main` into `orchestrator-in-progress` (`git merge main --no-edit`). This picks up any hotfixes pushed to `main` between runs.
+
+### Task Branching (inside submodule)
+
+After selecting a task (playbook Step 4) and before analyze/implement steps, set up the task's branch:
 
 1. **Determine the feature branch name:** `orchestrator/feature/{task-id}-{slug}` where slug is a lowercase hyphenated summary of the task title (max 40 chars).
 2. **Create the feature branch** if it doesn't exist: `git branch <feature-branch> orchestrator-in-progress`
@@ -74,31 +98,56 @@ After selecting a task (playbook Step 5) and before analyze/implement steps, set
    - If no previous attempts exist: branch from the feature branch
 5. **Create and checkout the attempt branch:** `orchestrator/feature/{task-id}-{slug}--attempt-{N}`
 
-Use the Bash tool for all git operations. Keep branch names clean — no spaces, no special characters beyond hyphens.
+All branching operations happen inside the submodule directory. Use the Bash tool with `cd` to the submodule path for all git commands.
 
-### What You Do NOT Do with Git
+### End of Iteration
 
-- **Do not commit.** The bash loop commits all changes after every sentinel.
-- **Do not merge.** The bash loop handles squash merges based on the sentinel you emit.
-- **Do not delete branches.** Attempt branches are the audit trail.
+**Always perform these steps after the pipeline completes, before emitting the sentinel:**
+
+#### In the submodule:
+
+1. **Commit** all changes on the current branch: `git add -A && git commit -m "<message>"`
+2. **If judge passed (task complete):**
+   - Merge attempt branch into feature branch: `git checkout <feature> && git merge <attempt>`
+   - Merge feature branch into `orchestrator-in-progress`: `git checkout orchestrator-in-progress && git merge <feature>`
+3. **If convergence achieved (all tasks done, QA passed):**
+   - Merge `orchestrator-in-progress` into `orchestrator-converged`: `git checkout orchestrator-converged && git merge orchestrator-in-progress`
+
+Skip commit if there are no changes (`git status --porcelain` is empty).
+
+#### In the parent repo:
+
+4. **Commit** on `main`: `git add -A && git commit -m "<message>"` — this captures plan file updates and the submodule ref change.
+5. **Push:** `git push origin main`
+
+Skip commit if there are no changes.
+
+### Branch naming
+
+Keep branch names clean — no spaces, no special characters beyond hyphens.
+
+### Do not delete branches
+
+Attempt and feature branches are the audit trail. Do not delete them.
 
 ### Convergence Runs
 
-When the playbook reaches the convergence gate (no tasks remaining), stay on `orchestrator-in-progress` — no task branch needed. The bash loop handles the in-progress → converged merge on `complete` sentinel.
+When the playbook reaches the convergence gate (no tasks remaining), stay on `orchestrator-in-progress` in the submodule — no task branch needed.
 
 ## Sentinel Convention
 
-Emit exactly one of these as the **very last line** of your response:
+Emit exactly one of these as the **very last line** of your response, after all git operations are complete:
 
-- `ORCHESTRATOR_RESULT:continue` — work was done, task not finished; bash commits only
-- `ORCHESTRATOR_RESULT:continue:done` — judge passed, task complete; bash commits then squash merges attempt → feature → in-progress
-- `ORCHESTRATOR_RESULT:complete` — convergence achieved; bash commits then merges in-progress → converged
-- `ORCHESTRATOR_RESULT:blocked` — something needs human attention; bash commits and stops
+- `ORCHESTRATOR_RESULT:continue` — work was done, keep looping
+- `ORCHESTRATOR_RESULT:complete` — convergence achieved, stop
+- `ORCHESTRATOR_RESULT:blocked` — something needs human attention, stop
 
-**Choosing between `continue` and `continue:done`:**
-- After a judge **pass** (task marked done): emit `continue:done`
+**Choosing the sentinel:**
+- After a judge **pass** (task marked done): emit `continue`
 - After a judge **fail**, analyzer escape valve, or any other non-completion: emit `continue`
 - After creating new tasks from QA lead feedback at convergence: emit `continue`
+- After convergence gate passes (QA audit clean, plan compacted, in-progress merged to converged): emit `complete`
+- When all remaining tasks are blocked: emit `blocked`
 
 **Before emitting `blocked`:** Output a summary of all blocked tasks and their feedback history.
 
