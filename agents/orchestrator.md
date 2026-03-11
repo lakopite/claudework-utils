@@ -57,7 +57,7 @@ Before executing the playbook, check for interrupted previous sessions:
 ## Agent Delegation
 
 When delegating to a role agent:
-- Use the agent's name as the `subagent_type` (e.g., `planner`, `analyzer`, `developer`, `judge`)
+- Use the agent's name as the `subagent_type` (e.g., `planner`, `analyzer`, `developer`, `test-fixer`, `judge`)
 - Build the prompt from the playbook's instructions for that step — include all specified inputs
 - The agent's response comes back to you. Use it as context for subsequent steps.
 - If an agent reports a blocking issue (e.g., analyzer escape valve), follow the playbook's instructions for that case.
@@ -68,6 +68,7 @@ When the playbook instructs you to read or update the plan:
 - **Read:** Use the Read tool on the plan file path specified in the playbook
 - **Update task status:** Use the Edit tool to change a task's status field
 - **Write feedback:** Use the Edit tool to append feedback lines under a task's `**feedback:**` section
+- **Compact feedback on done tasks:** When marking a task `done` after a judge pass, replace its entire feedback section with just the final `[judge:pass]` line. Remove all intermediate entries (`[judge:fail]`, `[planner]`, `[analyzer]`, `[test-fixer]` notes). Full history is preserved in git — the active plan stays lean.
 - **Mark in-progress:** When you select a task, set its status to `in-progress` before delegating
 
 ## Git Operations
