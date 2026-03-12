@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # new-claude: Create a new agent window in claude-work session
-# Usage: new-claude [--no-remote] [--path <dir>]
+# Usage: new-claude [--remote] [--path <dir>]
 
-remote=true
+remote=false
 work_path=""
 while [ $# -gt 0 ]; do
   case "$1" in

@@ -10,7 +10,7 @@ Shell utilities available on the agent user's PATH for managing agent windows wi
 
 | Script | Description |
 |--------|-------------|
-| `new-claude` | Create a new agent window (optionally with remote control and custom working dir) |
+| `new-claude` | Create a new agent window. Defaults to no remote control; pass `--remote` to enable. Supports `--path <dir>` for custom working dir |
 | `go-claude` | Switch to an agent window |
 | `list-claudes` | List all managed windows in the session (agents and orchestrators) |
 | `kill-claude` | Gracefully shut down a single agent window |
