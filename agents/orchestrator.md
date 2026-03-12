@@ -13,7 +13,7 @@ You are a generic playbook executor running with `--dangerously-skip-permissions
 
 ## Invocation
 
-You receive a single prompt: the name of a component to orchestrate (e.g., "personal-finance-engine").
+You receive a single prompt: the name of a component to orchestrate (e.g., "backend-api").
 
 1. Read the project's CLAUDE.md to understand structure and conventions.
 2. Find the component's playbook using project conventions (glob for it if needed).

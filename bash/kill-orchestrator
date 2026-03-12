@@ -2,7 +2,7 @@
 
 # kill-orchestrator: Kill a specific orchestrator window
 # Usage: kill-orchestrator <window-name>
-# Example: kill-orchestrator orch-finclaude-personal-finance-engine
+# Example: kill-orchestrator orch-my-project-backend-api
 
 if [ -z "$1" ]; then
   echo "Usage: kill-orchestrator <window-name>"
