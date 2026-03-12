@@ -147,6 +147,14 @@ This is where you design how the team (user + Claude) will actually work day-to-
 - Only pull specific files when relevant to the current discussion - don't load everything upfront
 - User templates (archetypes, playbook patterns) take precedence over external references
 
+**Multi-component agent scoping:** Agents are project-scoped; playbooks are component-scoped. When adding a component to a project with existing agents, audit each agent against the new component's needs:
+
+1. **Playbook can bridge the gap** — the agent works as-is, the playbook's step description provides component-specific directives. Most roles (judge, planner, reviewers) are naturally component-agnostic.
+2. **Agent can be generalized** — widen the agent so both playbooks can steer it via the orchestrator's prompt, without hurting the existing component.
+3. **Neither works** — split into two agents. This should be rare; prefer options 1-2.
+
+The component name is already the parameter (it's what the orchestrator receives). Behavioral differentiation lives in the playbook's step descriptions and/or the agent's project-level prompt. The architect's job is ensuring these two layers play nicely together across all components.
+
 **Phase 2 output:** Tailored CLAUDE.md, project-level agents (adapted from archetypes), playbook (adapted from pattern template), commands, hooks, and rules — each justified by the spec and explicit workflow decisions. No boilerplate. Every artifact has a clear reason to exist.
 
 **Documentation output:** The architect also produces parent repo documentation as part of Phase 2:
@@ -194,7 +202,7 @@ Based on this conversation:
 
 2. **Extract generic templates** where applicable — if the session produced specs, agents, commands, hooks, or rules that are generalizable beyond this specific project, offer to save cleaned-up versions to `~/templates/` for reuse. Discuss with the user which artifacts (if any) are worth templating before writing anything.
 
-This is the **only** time user-level notes are written. Do not update them during phases or between responses.
+User-level notes are also updated whenever the architect identifies a cross-project methodology learning during any mode — not just post-mortems. If a workflow session surfaces a principle that applies beyond this project, capture it.
 
 ---
 
@@ -212,7 +220,7 @@ Writing notes only applies in full mode. Ideate mode reads notes and surveys the
 - Open questions and unresolved topics
 - What was produced and what's still pending
 
-**User-level** (`~/.claude/_custom/command-notes/project-architect.md`) - **only written during the post-mortem interview** (see above)
+**User-level** (`~/.claude/_custom/command-notes/project-architect.md`) - **written during post-mortem interviews and whenever cross-project methodology learnings surface**
 
 Create the `_custom/command-notes/` directories if they don't exist.
 
