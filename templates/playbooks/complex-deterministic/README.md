@@ -33,38 +33,47 @@ Examples: simulation engines, data pipelines, API backends, libraries with well-
                     └──────┬───────┘
                            │
                     ┌──────┴───────┐
-                    │ Task Select  │
-                    │ + Branch     │
+                    │    Check     │
+                    │ Convergence  │
                     └──────┬───────┘
                            │
-                    ┌──────┴───────┐
-                    │    Route     │──── test-fix? ──┐
-                    └──────┬───────┘                 │
-                           │ standard                │
-                    ┌──────┴───────┐          ┌──────┴───────┐
-                    │   Analyzer   │          │  Test Fixer  │
-                    │  (double     │          │ (diagnostic) │
-                    │   diamond)   │          └──────┬───────┘
-                    └──────┬───────┘                 │
-                           │                         │
-              ┌────────────┴────────────┐            │
-              │                         │            │
-       ┌──────┴───────┐  ┌─────────────┴─┐          │
-       │  Test Writer  │  │   Developer   │          │
-       │ (contrarian)  │  │ (simplifier)  │          │
-       └──────┬───────┘  └──────┬────────┘          │
-              │                  │                   │
-              └────────┬─────────┘                   │
-                       │                             │
-                ┌──────┴───────┐◄────────────────────┘
-                │    Judge     │
-                │  (precision) │
-                └──────┬───────┘
-                       │
-                       ▼
-              pass → mark done, compact feedback, continue
-              fail → write feedback, continue
-              all done → convergence gate ▼
+              ┌────────────┴────────────────┐
+              │ tasks remain                │ all done
+              ▼                             ▼
+       ┌──────────────┐          CONVERGENCE GATE ▼
+       │ Task Select  │
+       │ + Branch     │
+       └──────┬───────┘
+              │
+       ┌──────┴───────┐
+       │    Route     │──── test-fix? ──┐
+       └──────┬───────┘                 │
+              │ standard                │
+       ┌──────┴───────┐          ┌──────┴───────┐
+       │   Analyzer   │          │  Test Fixer  │
+       │  (double     │          │ (diagnostic) │
+       │   diamond)   │          └──────┬───────┘
+       └──────┬───────┘                 │
+              │                         │
+ ┌────────────┴────────────┐            │
+ │                         │            │
+┌┴─────────────┐  ┌───────┴───────┐    │
+│  Test Writer  │  │   Developer   │    │
+│ (contrarian)  │  │ (simplifier)  │    │
+└──────┬───────┘  └──────┬────────┘    │
+       │                  │             │
+       └────────┬─────────┘             │
+                │                       │
+         ┌──────┴───────┐◄─────────────┘
+         │    Judge     │
+         │  (precision) │
+         └──────┬───────┘
+                │
+                ▼
+       pass → mark done, compact feedback, continue ─┐
+       fail → write feedback, continue ──────────────┤
+                                                     │
+                              (bash loop re-runs) ◄──┘
 
 ┌─────────────────────────────────────────────────────────┐
 │                   CONVERGENCE GATE                       │
