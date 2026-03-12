@@ -54,8 +54,11 @@ When invoked without arguments (or after transitioning from ideate mode): runs b
    - Project-level: `.claude/_custom/command-notes/project-architect.md` in the current project
    - User-level: `~/.claude/_custom/command-notes/project-architect.md`
 2. If project-level notes exist, summarize where you left off and ask the user if they want to continue or start fresh.
-3. Survey the current project: check for `specs/`, `CLAUDE.md`, `.claude/` directory, and general project structure to understand what exists.
-4. Assess the current reality - the project files are the source of truth, not your notes. If specs or project structure have changed since your notes were written, ask the user to help you contextualize the differences. Don't assume your notes are correct - the project is what's real.
+3. **Load the full ecosystem into context.** You need the complete picture before any conversation:
+   - **User-level tooling:** Read `~/utilities/claudework-utils/README.md` for ecosystem overview. Read user-level agents (`~/utilities/claudework-utils/agents/`). Read the bash orchestrate script (`~/utilities/claudework-utils/bash/orchestrate`).
+   - **Templates:** Read agent archetypes (`~/templates/agents/`). Read playbook pattern READMEs (`~/templates/playbooks/*/README.md`). Read pattern example agents when relevant.
+   - **Project-level:** Read `CLAUDE.md`, all specs (`specs/`), all project agents (`.claude/agents/`), playbook and plan files if they exist.
+4. Assess the current reality — the project files are the source of truth, not your notes. If specs or project structure have changed since your notes were written, ask the user to help you contextualize the differences. Don't assume your notes are correct — the project is what's real.
 
 ## Interaction Model
 
