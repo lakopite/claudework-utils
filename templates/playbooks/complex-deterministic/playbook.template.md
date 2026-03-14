@@ -152,10 +152,10 @@ After Steps 6a and 6b complete, the orchestrator checks the selected task for `p
 ### Step 7: Judge
 
 - **agent:** judge
-- **input:** Run the full unit test suite (not just task-scoped tests). If tests fail, report failures precisely and stop (short-circuit — no spec compliance review on broken work). If tests pass, review the changes against the spec. Pass only if all tests pass AND changes are correct per spec.
+- **input:** Run task-scoped tests (from Step 6a). If post-subtasks ran, also run the specific files the test-fixer modified (from its report). If tests fail, report failures precisely and stop (short-circuit — no spec compliance review on broken work). If tests pass, review the changes against the spec. Pass only if all tests pass AND changes are correct per spec.
 - **receives:**
   - *Standard pipeline:* analyzer's implementation spec, test file paths from Step 6a
-  - *Standard pipeline with post-subtasks:* analyzer's implementation spec, test file paths from Step 6a, test-fixer report from Step 6c
+  - *Standard pipeline with post-subtasks:* analyzer's implementation spec, test file paths from Step 6a, test-fixer report from Step 6c (includes list of modified files)
   - *Test-fix pipeline:* test-fixer report from Step 5alt, spec path
 - **output:** verdict (pass/fail with precise details)
 

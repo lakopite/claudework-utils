@@ -63,7 +63,7 @@ Produce a plan feedback line — a concise summary prefixed with `[judge:pass]` 
 | Decision | Description |
 |----------|-------------|
 | **Primary verification method** | What mechanical check runs first? (test suite, build, render, lint, etc.) |
-| **Verification scope** | Task-scoped only, or full suite? When post-subtasks run (test-fixer cleans stale regressions), the judge should run the full suite to verify both new and fixed tests pass. |
+| **Verification scope** | Task-scoped by default. When post-subtasks run (test-fixer cleans stale regressions), also run the specific files the test-fixer modified — but not the entire suite, since unrelated tests may legitimately fail for not-yet-implemented tasks. |
 | **Tools needed** | Depends on verification method (e.g., Bash for running tests) |
 | **Model tier** | opus if spec compliance requires deep reading, sonnet if primary verification is the main gate |
 | **Domain-specific constraints** | Any project-specific things the judge should check or ignore |

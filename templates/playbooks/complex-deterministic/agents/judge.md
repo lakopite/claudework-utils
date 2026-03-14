@@ -20,7 +20,7 @@ You receive from the orchestrator:
 
 ### Step 1: Run Tests (short-circuit gate)
 
-1. Run the full unit test suite (not just task-scoped tests). When post-subtasks have run (Step 6c), the full suite must pass — both new task-scoped tests and fixed stale tests. Capture the output.
+1. Run task-scoped unit tests. If post-subtasks ran (Step 6c), also run the specific files the test-fixer modified (from its report) — but not the entire suite. Capture the output.
 2. If any tests fail: **stop here.** Report the failures precisely and produce your verdict. Do not proceed to spec compliance review — failed tests are the immediate signal, and investigating spec compliance on broken code wastes a cycle.
 
 ### Step 2: Spec Compliance (only if all tests pass)
