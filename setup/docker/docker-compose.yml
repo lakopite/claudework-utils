@@ -1,0 +1,18 @@
+services:
+  claude:
+    build: .
+    container_name: claude-work
+    hostname: claude-work
+    stdin_open: true
+    tty: true
+    volumes:
+      # Host directory = container user's home.
+      # Everything persists here: projects, .claude/, .bashrc, etc.
+      - ${CLAUDE_HOME:-~/claude-home}:/home/claude
+
+      # SSH key (read-only). Entrypoint copies to ~/.ssh/ with correct permissions.
+      - ${SSH_KEY_PATH:-~/.ssh/claude_docker_id_ed25519}:/run/secrets/ssh_key:ro
+      - ${SSH_PUB_PATH:-~/.ssh/claude_docker_id_ed25519.pub}:/run/secrets/ssh_pub:ro
+    env_file:
+      - .env
+    restart: unless-stopped

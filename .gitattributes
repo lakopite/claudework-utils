@@ -1,0 +1,6 @@
+# Ensure shell scripts use LF line endings (prevents breakage when cloned on Windows)
+*.sh text eol=lf
+bash/* text eol=lf
+setup/os-user/claudework text eol=lf
+setup/docker/entrypoint.sh text eol=lf
+setup/docker/claudework text eol=lf

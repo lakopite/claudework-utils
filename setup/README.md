@@ -1,45 +1,25 @@
 # Setup
 
-Scripts and configuration for bootstrapping a claudework session.
+Two ways to create the sandboxed `claude-work` tmux session. Both produce the same environment — bash utilities on PATH, agents/commands/templates symlinked, projects directory ready. Everything downstream (agents, orchestration, slash commands) works identically regardless of which setup you choose.
 
-## claudework
+| | [Dedicated OS User](os-user/README.md) | [Docker Container](docker/README.md) |
+|---|---|---|
+| **Isolation** | Separate OS user (`claude`) | Container filesystem |
+| **Entry** | `sudo -u claude -i` into tmux | `docker exec` into tmux |
+| **Auth** | Claude CLI interactive OAuth | API key via env vars (e.g. OpenRouter) |
+| **Bastion/rotator** | Yes — remote control for Claude Code Web | No — not needed, not applicable with API key auth |
+| **Persistence** | User's home directory | Host bind mount (`~/claude-home`) |
+| **Platform** | Linux / macOS | Linux / macOS / Windows (WSL) |
+| **Best for** | Claude Max users who want remote control access | API key users, cross-platform, simpler isolation |
 
-Entry point script to create or attach to the `claude-work` tmux session. Run this as your personal user (not as the `claude` user directly). It uses `sudo` to launch and manage the session under a dedicated `claude` OS user, which allows sandboxing (e.g. preventing automount access).
+## After setup
 
-Install to your personal user's `~/.local/bin/claudework`.
-
-## PATH setup (claude user)
-
-Add the repo's `bash/` directory to the claude user's PATH in `~/.bashrc`:
-
-```bash
-export PATH="/path/to/claudework-utils/bash:$PATH"
-```
-
-This makes all bash utilities available without symlinks, and any scripts added to or removed from `bash/` are immediately available.
-
-## Commands setup (claude user)
-
-Symlink command files to `~/.claude/commands/`:
+Both paths give you a `claude-work` tmux session with a `home-base` window. From there, usage is identical:
 
 ```bash
-mkdir -p ~/.claude/commands
-for f in /path/to/claudework-utils/commands/*.md; do
-  ln -sf "$f" ~/.claude/commands/"$(basename "$f")"
-done
+project-architect my-project    # Design a new project
+run-orchestrate my-project engine  # Run autonomous pipeline
+list-claudes                    # See what's running
 ```
 
-This makes slash commands available across all sessions. Edits to the repo are immediately live.
-
-## Agents setup (claude user)
-
-Symlink agent files to `~/.claude/agents/`:
-
-```bash
-mkdir -p ~/.claude/agents
-for f in /path/to/claudework-utils/agents/*.md; do
-  ln -sf "$f" ~/.claude/agents/"$(basename "$f")"
-done
-```
-
-This makes user-level agents available across all projects. Project-level agents (in `.claude/agents/`) take precedence. Edits to the repo are immediately live.
+See the [examples](../examples/README.md) for full walkthroughs.

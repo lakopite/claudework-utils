@@ -1,0 +1,35 @@
+#!/bin/bash
+# claudework: Create or attach to the claude-work Docker container + tmux session
+# Install to your ~/.local/bin/claudework (or add to PATH)
+#
+# Starts the container if not running, then attaches to the tmux session inside it.
+# Detach with Ctrl-B D to return to your host shell; the container keeps running.
+
+set -e
+
+# Resolve the docker-compose directory (same directory as this script)
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+COMPOSE_DIR="$SCRIPT_DIR"
+
+if [ ! -f "$COMPOSE_DIR/docker-compose.yml" ]; then
+  echo "ERROR: docker-compose.yml not found at $COMPOSE_DIR"
+  echo "Expected layout: setup/docker/claudework + setup/docker/docker-compose.yml"
+  exit 1
+fi
+
+if [ ! -f "$COMPOSE_DIR/.env" ]; then
+  echo "ERROR: .env not found at $COMPOSE_DIR/.env"
+  echo "Copy .env.example to .env and fill in your API key:"
+  echo "  cp $COMPOSE_DIR/.env.example $COMPOSE_DIR/.env"
+  exit 1
+fi
+
+# Start container if not running
+if ! docker ps --format '{{.Names}}' | grep -q '^claude-work$'; then
+  echo "Starting claude-work container..."
+  docker compose -f "$COMPOSE_DIR/docker-compose.yml" up -d --build
+  sleep 3
+fi
+
+# Attach to tmux inside the container
+exec docker exec -it claude-work tmux attach -t claude-work
