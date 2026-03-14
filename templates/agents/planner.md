@@ -55,7 +55,7 @@ From the orchestrator:
 ## Plan File Management
 
 ### Task Format
-Each task has: status, spec sections, dependencies, scope, feedback log, and optional pipeline tag and calibration references.
+Each task has: status, spec sections, dependencies, scope, feedback log, and optional pipeline tag, calibration references, and post-subtasks.
 
 ### Statuses
 - **pending** — ready for pipeline
@@ -71,6 +71,11 @@ Running log under each task, prefixed with `[agent:verdict]`:
 
 ### Pipeline Tagging
 The planner routes tasks to alternate pipelines by tagging them (e.g., `pipeline: test-fix`). The orchestrator reads the tag and routes accordingly. Standard pipeline is the default (no tag needed).
+
+### Post-Subtasks
+When a standard pipeline task will predictably break existing tests (removing public APIs, renaming interfaces, changing defaults), attach a `post-subtasks` entry. Post-subtasks run after dev/test-writer (Step 6c), before judge — child work within the same iteration.
+
+Create proactively when regressions are predictable, or retroactively when a judge failure reveals stale regressions. Scope should list specific files affected. The analyzer only receives the main task scope; post-subtask descriptions are excluded from the implementation spec.
 
 ### Attempt Branch Decisions
 On failed tasks, the planner decides retry strategy:

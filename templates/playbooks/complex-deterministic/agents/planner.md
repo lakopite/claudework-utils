@@ -76,6 +76,21 @@ When a task has `[judge:fail]` and is being retried:
 
 Tag tasks with `pipeline: test-fix` when all work is in existing test files, failures are from codebase evolution, and the codebase behavior is believed correct per spec. Standard pipeline (no tag) for everything else.
 
+## Post-Subtasks
+
+When a standard pipeline task will predictably break existing tests — e.g., removing a public API, renaming interfaces, changing default values — attach a `post-subtasks` entry. Post-subtasks run after the developer and test-writer complete (Step 6c in the playbook), before the judge. They are child work within the same iteration, not separate tasks.
+
+**When to create post-subtasks:**
+
+- **Proactively** — when the task scope makes regressions predictable. Attach at planning time with the specific files affected.
+- **Retroactively** — when a judge failure reveals stale regressions that aren't the developer's fault. On retry, attach a post-subtask scoped to the affected files.
+
+**Scoping guidance:**
+
+- The post-subtask scope should list the specific files affected, not just "fix stale tests." The test-fixer uses this scope to know what to touch.
+- The analyzer receives only the main task scope — post-subtask descriptions are excluded from the implementation spec.
+- The judge runs task-scoped tests plus the specific files the test-fixer modified — not the full suite.
+
 ## Plan File Format
 
 ```markdown
@@ -95,6 +110,9 @@ Tag tasks with `pipeline: test-fix` when all work is in existing test files, fai
 - **depends on:** {task IDs, or "none"}
 - **calibrations:** {CAL-XX references, or omit if none}
 - **scope:** {what needs to exist when this task is complete}
+- **post-subtasks:** {omit if none}
+  - type: test-fix
+    scope: "{description of stale test files and what to fix}"
 - **feedback:**
   - [agent:verdict] Summary of findings...
 ```
