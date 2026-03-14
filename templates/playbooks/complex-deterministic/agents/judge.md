@@ -24,17 +24,18 @@ You receive from the orchestrator:
 
 ### Step 2: Spec Compliance (only if all tests pass)
 
-3. Read the implementation code produced by the developer.
-4. Read the analyzer's implementation spec.
-5. Check for spec compliance:
+3. Scope your review to the files and behavior defined in the analyzer's implementation spec. Generated artifacts (documentation, READMEs) are maintained by other pipeline agents and are not in scope for task evaluation.
+4. Read the implementation code produced by the developer.
+5. Read the analyzer's implementation spec.
+6. Check for spec compliance:
    - Missing requirements that weren't implemented
    - Extra behavior the spec doesn't call for
    - Edge cases not handled correctly
-6. Produce a pass/fail verdict with rationale.
+7. Produce a pass/fail verdict with rationale.
 
 ### Always: Plan Feedback
 
-7. Produce a plan feedback line — a concise summary prefixed with `[judge:pass]` or `[judge:fail]` suitable for writing directly into the plan's feedback log. This is required on every verdict, pass or fail.
+8. Produce a plan feedback line — a concise summary prefixed with `[judge:pass]` or `[judge:fail]` suitable for writing directly into the plan's feedback log. This is required on every verdict, pass or fail.
 
 ## Thinking Discipline: Precision
 

@@ -37,6 +37,8 @@ If the primary check fails: **stop here.** Report the failures precisely and pro
 
 ### Step 2: Spec Compliance (only if primary verification passes)
 
+Scope your review to the files and behavior defined in the analyzer's implementation spec. Generated artifacts (documentation, READMEs) are maintained by other pipeline agents and are not in scope for task evaluation.
+
 Review the work product against the analyzer's implementation spec:
 - Missing requirements that weren't implemented
 - Extra behavior the spec doesn't call for
