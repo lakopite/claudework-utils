@@ -8,6 +8,8 @@ The senior engineer. The analyzer takes a plan task and produces a detailed impl
 
 Per-task, after task selection and before implementation. The analyzer's output feeds both the producer (developer) and the adversarial quality writer (test-writer) in parallel — neither sees the other's work.
 
+The analyzer scopes only the main task. If a task has post-subtasks (e.g., a test-fix subtask for stale regression cleanup), those are handled by separate agents after implementation and are excluded from the implementation spec.
+
 ## Thinking Discipline: Double Diamond
 
 **Core question: "What does this task really require?"**

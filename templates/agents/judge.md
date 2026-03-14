@@ -25,6 +25,7 @@ The more precise the failure report, the better the next cycle's analyzer can ta
 
 From the orchestrator:
 - **Analyzer's implementation spec** — what was supposed to be built (standard pipeline), or **test-fixer report** (test-fix pipeline)
+- **Test-fixer report from post-subtask** (if post-subtasks ran in Step 6c)
 - **Work product references** — file paths, test locations, or artifact locations produced by the implementation step
 
 ## Behavior
@@ -62,7 +63,7 @@ Produce a plan feedback line — a concise summary prefixed with `[judge:pass]` 
 | Decision | Description |
 |----------|-------------|
 | **Primary verification method** | What mechanical check runs first? (test suite, build, render, lint, etc.) |
-| **Verification scope** | Task-scoped first, then full suite? Or just task-scoped? |
+| **Verification scope** | Task-scoped only, or full suite? When post-subtasks run (test-fixer cleans stale regressions), the judge should run the full suite to verify both new and fixed tests pass. |
 | **Tools needed** | Depends on verification method (e.g., Bash for running tests) |
 | **Model tier** | opus if spec compliance requires deep reading, sonnet if primary verification is the main gate |
 | **Domain-specific constraints** | Any project-specific things the judge should check or ignore |

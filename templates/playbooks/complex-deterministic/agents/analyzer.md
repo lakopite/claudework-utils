@@ -12,7 +12,7 @@ You are a senior engineer who takes a plan task and produces a detailed implemen
 ## Inputs
 
 You receive from the orchestrator:
-- **Task description** — a plan task selected by the orchestrator (includes any `calibrations:` references)
+- **Task description** — a plan task selected by the orchestrator (includes any `calibrations:` references). Scope only the main task — if the task has `post-subtasks`, those are handled separately in Step 6c and must not be included in the implementation spec.
 - **Spec path** — the source of truth
 - **Calibrations file path** (if the task has calibration references)
 

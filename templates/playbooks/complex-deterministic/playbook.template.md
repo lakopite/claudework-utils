@@ -91,8 +91,8 @@ Read the selected task's `pipeline:` field.
 ### Step 5: Analyze Task (standard pipeline)
 
 - **agent:** analyzer
-- **input:** The selected task description from the plan, plus access to the full codebase. Produce a detailed implementation spec for this task using the double diamond approach. If the task has calibration references, read and incorporate them.
-- **receives:** selected task from plan, spec path, calibrations file path (if task has calibration references)
+- **input:** The selected task description from the plan, plus access to the full codebase. Produce a detailed implementation spec for this task using the double diamond approach. If the task has calibration references, read and incorporate them. Scope only the main task — post-subtasks (if present) are handled separately in Step 6c and must not be included in the implementation spec.
+- **receives:** selected task from plan (main scope only, excluding post-subtask descriptions), spec path, calibrations file path (if task has calibration references)
 - **output:** implementation spec (held in orchestrator context for Steps 6a/6b)
 - **feedback:** If the analyzer discovers the task is bigger than expected, has hidden dependencies, or needs to be split, it should say so clearly. The orchestrator will write these findings back to the plan and skip to the sentinel with `continue`.
 
@@ -129,12 +129,33 @@ Fire both agents simultaneously. Neither sees the other's output.
 
 ---
 
+### Step 6c: Post-Subtasks
+
+After Steps 6a and 6b complete, the orchestrator checks the selected task for `post-subtasks` in the plan.
+
+**If no post-subtasks:** proceed to Step 7.
+
+**If post-subtasks exist:** run each subtask sequentially through its designated pipeline agent. Currently supported subtask types:
+
+#### Post-subtask type: `test-fix`
+
+- **agent:** test-fixer
+- **input:** The post-subtask scope from the plan. Run the test suite (unit tests only, exclude integration test directory) to identify failures in existing test files caused by the main task's changes. Read the spec to determine correct behavior. Classify each failure as stale test assertion or spec violation in the implementation. Fix all stale assertions and rerun to confirm. If any implementation bug is found, stop immediately and report all findings without fixing anything.
+- **receives:** post-subtask scope from the plan, spec path, calibrations file path (if task has calibration references), unit test directory, integration test directory
+- **output:** test-fixer report (held in orchestrator context for Step 7)
+- **escape valve:** If the test-fixer reports spec violations in the implementation, the orchestrator writes findings as `[test-fixer]` feedback on the task and skips to the sentinel with `continue`. The judge does not run. The next iteration's planner addresses the implementation issue.
+
+**Then:** proceed to Step 7.
+
+---
+
 ### Step 7: Judge
 
 - **agent:** judge
-- **input:** Run the task-scoped tests first. If tests fail, report failures precisely and stop (short-circuit — no spec compliance review on broken work). If tests pass, review the changes against the spec. Pass only if all tests pass AND changes are correct per spec.
+- **input:** Run the full unit test suite (not just task-scoped tests). If tests fail, report failures precisely and stop (short-circuit — no spec compliance review on broken work). If tests pass, review the changes against the spec. Pass only if all tests pass AND changes are correct per spec.
 - **receives:**
   - *Standard pipeline:* analyzer's implementation spec, test file paths from Step 6a
+  - *Standard pipeline with post-subtasks:* analyzer's implementation spec, test file paths from Step 6a, test-fixer report from Step 6c
   - *Test-fix pipeline:* test-fixer report from Step 5alt, spec path
 - **output:** verdict (pass/fail with precise details)
 

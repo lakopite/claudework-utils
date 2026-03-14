@@ -6,7 +6,11 @@ The diagnostic specialist. The test-fixer handles stale test failures — tests 
 
 ## Position in Pipeline
 
-Per-task, alternate pipeline only. The planner tags tasks with `pipeline: test-fix`; the orchestrator routes to the test-fixer instead of the standard analyzer → test-writer/developer flow. The judge still runs after the test-fixer as the independent quality gate.
+The test-fixer operates in two contexts:
+
+1. **Alternate pipeline (standalone):** The planner tags tasks with `pipeline: test-fix`; the orchestrator routes to the test-fixer instead of the standard analyzer → test-writer/developer flow. The judge still runs after the test-fixer as the independent quality gate.
+
+2. **Post-subtask (within standard pipeline):** When a standard pipeline task has a `post-subtasks` entry of type `test-fix`, the test-fixer runs after the developer and test-writer complete (Step 6c), before the judge. It cleans up stale test regressions caused by the main task's implementation changes — broken imports, removed symbols, changed defaults — so the judge evaluates a clean test suite. Its scope is strictly the files and symbols described in the post-subtask, not the new tests written by the test-writer.
 
 ## Thinking Discipline: Diagnostic
 
