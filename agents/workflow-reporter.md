@@ -21,15 +21,13 @@ The **orchestrator** is a generic convergence loop that executes a project-speci
 - Completed plan (`*.plan.completed.md`) — archived finished tasks from prior phases
 - Calibrations (`*.plan.calibrations.md`) — recurring patterns the system has identified
 - Git history — commits in parent repo and submodules corroborate what happened
-- Report marker (`last-report-{component}.json`) — timestamp of last report
 
 ## Invocation
 
 Determine the mode from the user's prompt:
 
 - **Single run analysis (default)** — analyze the most recent run in detail. Also used when the user asks about a specific run by ID. This is the default for any request without explicit multi-run scope.
-- **Run list** — "list runs", "recent runs", "what runs have there been". Summary table of recent runs.
-- **Since last report** — "full summary", "since last report", "overall progress". Aggregate across runs.
+- **Run list** — "list runs", "recent runs", "show me runs since X". Summary table of runs, optionally scoped by time or git ref.
 
 When in doubt, use **single run analysis** on the most recent run.
 
@@ -89,59 +87,15 @@ For each iteration, determine which task it worked on using these signals (in pr
 - {any failures, patterns, or concerns — or "none"}
 ```
 
-6. **Update the report marker.**
-
 ## Mode: Run List
 
 1. Read `runs.json` and the active plan.
-2. For each run (most recent first), summarize: run ID (short), start time, status, iteration count, tasks covered (from branch fields or git).
-3. Show as a table. Include current plan progress at the bottom.
-4. Update the report marker.
-
-## Mode: Since Last Report
-
-1. **Find the last report marker.** If missing, this is the first report.
-
-2. **Gather run data since last report:** run count, iteration count, sentinel distribution.
-
-3. **Gather git history since last report** in parent repo and submodules.
-
-4. **Read current plan state:** tasks by status, active calibrations.
-
-5. **Compute workflow metrics:** judge pass/fail ratio, avg iterations per task, blocked tasks.
-
-6. **Produce the report:**
-
-```markdown
-## Workflow Report: {component}
-**Period:** {last report date} -> {now}
-**Runs:** {N runs}, {N total iterations}
-
-### Work Completed
-- {list of tasks completed with one-line descriptions}
-
-### Current State
-- Total tasks: {N} | Done: {N} | Pending: {N} | Blocked: {N}
-- Active calibrations: {list or "none"}
-
-### Workflow Metrics
-- Judge pass rate: {N}% ({passes}/{total judgments})
-- Avg iterations per completion: {N}
-- Sentinel distribution: {continue: N, complete: N, blocked: N, no-sentinel: N}
-
-### Issues
-- {blocked tasks, stagnation patterns, or "none"}
-
-### Git Summary
-- Parent repo: {N commits}, {files changed summary}
-- Submodule: {N commits}, {files changed summary}
-```
-
-7. **Update the report marker.**
+2. Scope the list: if the user specifies a git ref or timestamp, only include runs after that point. Otherwise show all runs.
+3. For each run (most recent first), summarize: run ID (short), start time, status, iteration count, tasks covered (from branch fields or git).
+4. Show as a table. Include current plan progress at the bottom.
 
 ## Constraints
 
-- Read-only — do not modify plan files, code, or agent definitions
-- The report marker file is the only thing you write (besides the report output itself)
+- Read-only — do not modify plan files, code, or agent definitions, and do not write any files
 - If run data is incomplete or missing, report what you can and note the gaps
 - Do not diagnose issues — just surface them. The planner and reviewers handle diagnosis
