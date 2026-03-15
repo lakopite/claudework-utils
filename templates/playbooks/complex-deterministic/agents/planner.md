@@ -71,6 +71,7 @@ When you tag a task with `calibrations: CAL-01`, the analyzer reads that calibra
 When a task has `[judge:fail]` and is being retried:
 - **Continue from previous attempt** — minor fix needed. Write: `[planner] Retry from previous attempt — {reason}`
 - **Fresh start** — fundamental rework needed. Write: `[planner] Fresh start — {reason}`
+- **Re-tag to test-fix** — judge failed purely on test bugs (fixture errors, premise bugs, wrong assertions), implementation is correct per spec. Re-tag the task's `pipeline:` field to `test-fix` and update the scope to list the specific test files and failures. Write: `[planner] Re-tag to test-fix — {reason}`. The orchestrator routes to the test-fixer on the next iteration via Step 4b, skipping the full standard pipeline. Use this when no new implementation or test coverage is needed — the only remaining delta is diagnostic fixes to tests already written by the test-writer.
 
 ## Pipeline Tagging
 

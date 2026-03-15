@@ -6,11 +6,13 @@ The diagnostic specialist. The test-fixer handles stale test failures — tests 
 
 ## Position in Pipeline
 
-The test-fixer operates in two contexts:
+The test-fixer operates in three contexts:
 
-1. **Alternate pipeline (standalone):** The planner tags tasks with `pipeline: test-fix`; the orchestrator routes to the test-fixer instead of the standard analyzer → test-writer/developer flow. The judge still runs after the test-fixer as the independent quality gate.
+1. **Standalone task** (`pipeline: test-fix`)**:** The planner tags tasks with `pipeline: test-fix`; the orchestrator routes to the test-fixer instead of the standard analyzer → test-writer/developer flow. Used for cross-cutting stale test cleanup not specific to a single task — e.g., test files broken by codebase evolution across multiple tasks. The judge still runs after as the independent quality gate.
 
-2. **Post-subtask (within standard pipeline):** When a standard pipeline task has a `post-subtasks` entry of type `test-fix`, the test-fixer runs after the developer and test-writer complete (Step 6c), before the judge. It cleans up stale test regressions caused by the main task's implementation changes — broken imports, removed symbols, changed defaults — so the judge evaluates a clean test suite. Its scope is strictly the files and symbols described in the post-subtask, not the new tests written by the test-writer.
+2. **Post-subtask** (within standard pipeline)**:** When a standard pipeline task has a `post-subtasks` entry of type `test-fix`, the test-fixer runs after the developer and test-writer complete (Step 6c), before the judge. It cleans up predictable collateral damage — stale regressions in existing tests caused by the main task's implementation changes (broken imports, removed symbols, changed defaults). Attached proactively when regressions are predictable, or retroactively after a judge failure reveals them. Its scope is strictly the files and symbols described in the post-subtask, not the new tests written by the test-writer.
+
+3. **Retry re-tag:** When a standard pipeline task's judge fails purely on test bugs (fixture errors, premise bugs, wrong assertions) with the implementation correct per spec, the planner re-tags the task to `pipeline: test-fix`. This routes the retry directly to the test-fixer instead of re-running the full standard pipeline. The distinction from post-subtask: no new implementation or test coverage is needed — the only remaining delta to "done" is diagnostic fixes to test files already written by the test-writer.
 
 ## Thinking Discipline: Diagnostic
 
@@ -26,7 +28,7 @@ For every failing test, trace the logic end-to-end:
 ## Inputs
 
 From the orchestrator:
-- **Task description** — plan task tagged `pipeline: test-fix`, listing test files and/or failures to investigate
+- **Task description** — either a standalone `pipeline: test-fix` task, a post-subtask scope, or a re-tagged retry task. All list the test files and/or failures to investigate.
 - **Spec path** — the source of truth for correct behavior
 - **Calibrations file path** (if task has calibration references)
 - **Test directories** — where unit tests and integration tests live (integration tests excluded from scope)

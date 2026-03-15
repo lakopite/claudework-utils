@@ -81,6 +81,7 @@ Create proactively when regressions are predictable, or retroactively when a jud
 On failed tasks, the planner decides retry strategy:
 - **Continue from previous attempt** — minor fix needed. Write: `[planner] Retry from previous attempt — {reason}`
 - **Fresh start** — fundamental rework needed. Write: `[planner] Fresh start — {reason}`
+- **Re-tag to test-fix** — judge failed purely on test bugs (fixture errors, premise bugs, wrong assertions), implementation is correct per spec. Re-tag the task's `pipeline:` to `test-fix` and scope the task to the specific test files and failures. Write: `[planner] Re-tag to test-fix — {reason}`. The orchestrator routes to the test-fixer on the next iteration via Step 4b. This avoids a redundant standard pipeline cycle when no new implementation or test coverage is needed — the only remaining work is diagnostic fixes to existing test files.
 
 ### Blocked Detection
 Two consecutive `[judge:fail]` entries → mark blocked. Re-evaluate if user modifies spec or plan.
